@@ -225,8 +225,8 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
       {/* Card Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Filters</h2>
+      <div className="flex items-center justify-between p-3 border-b border-gray-200">
+        <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Filters</h2>
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleVisibility}

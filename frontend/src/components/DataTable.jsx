@@ -170,7 +170,7 @@ export function DataTable({ data, onRowClick }) {
   return (
     <div className="relative">
       {/* Column visibility toggle - right-aligned ghost button */}
-      <div className="mb-4 flex justify-end">
+      <div className="mb-2 flex justify-end">
         <details className="relative">
           <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded px-3 py-1.5 flex items-center gap-2 list-none">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
