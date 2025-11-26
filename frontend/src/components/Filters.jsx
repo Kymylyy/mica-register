@@ -38,7 +38,7 @@ const COUNTRY_NAMES = {
   'EL': 'Greece', // Alternative code for Greece
 };
 
-export function Filters({ filters, onFiltersChange, onClearFilters }) {
+export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = true, onToggleVisibility }) {
   const [filterOptions, setFilterOptions] = useState({
     home_member_states: [],
     service_codes: [],
@@ -102,10 +102,17 @@ export function Filters({ filters, onFiltersChange, onClearFilters }) {
     // Fetch filter options
     axios.get('/api/filters/options')
       .then(response => {
-        console.log('Filter options received:', response.data);
-        console.log('Service codes:', response.data.service_codes);
-        console.log('Service codes length:', response.data.service_codes?.length);
-        setFilterOptions(response.data || { home_member_states: [], service_codes: [] });
+        // Sort service codes by MiCA order
+        const sortedServiceCodes = response.data.service_codes.sort((a, b) => 
+          getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code)
+        );
+        setFilterOptions({
+          ...response.data,
+          service_codes: sortedServiceCodes.map(s => ({
+            ...s,
+            description: getServiceDescriptionCapitalized(s.code) // Capitalize for display
+          }))
+        });
       })
       .catch(error => {
         console.error('Error fetching filter options:', error);
@@ -206,398 +213,410 @@ export function Filters({ filters, onFiltersChange, onClearFilters }) {
     handleChange('home_member_states', newStates);
   };
 
+  // Get active filter count for display
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (filters.auth_date_from || filters.auth_date_to) count++;
+    if (filters.home_member_states?.length > 0) count++;
+    if (filters.service_codes?.length > 0) count++;
+    return count;
+  };
+
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
-      <div className="flex items-center justify-end mb-4">
-        <button
-          onClick={onClearFilters}
-          className="text-sm text-primary hover:underline"
-        >
-          Clear all
-        </button>
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+      {/* Card Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Filters</h2>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onToggleVisibility}
+            className="text-sm text-gray-600 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded px-2 py-1"
+            aria-label={isVisible ? 'Hide filters' : 'Show filters'}
+          >
+            {isVisible ? 'Hide filters' : 'Show filters'}
+          </button>
+          <button
+            onClick={onClearFilters}
+            className="text-sm text-gray-600 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded px-2 py-1"
+            aria-label="Clear all filters"
+          >
+            Clear all
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Search */}
-        <div>
-          <input
-            type="text"
-            value={filters.search || ''}
-            onChange={(e) => handleChange('search', e.target.value)}
-            placeholder="Search by anything..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
+      {isVisible && (
+        <div className="p-4 space-y-4">
+          {/* Search Bar */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={filters.search || ''}
+              onChange={(e) => handleChange('search', e.target.value)}
+              placeholder="Search by anything..."
+              className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              aria-label="Search entities"
+            />
+            {filters.search && (
+              <button
+                onClick={() => handleChange('search', '')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+                aria-label="Clear search"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
 
-        {/* Authorisation Date - Collapsible */}
-        <div className="md:col-span-2">
-          <details 
-            ref={authDateDetailsRef}
-            className="border border-gray-300 rounded-md"
-            onToggle={(e) => {
-              if (e.target.open) {
-                // Auto-focus on first date input when opened
-                setTimeout(() => {
-                  const firstDateInput = e.target.querySelector('input[type="date"]');
-                  if (firstDateInput) firstDateInput.focus();
-                }, 10);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' && authDateDetailsRef.current?.open) {
-                e.preventDefault();
-                authDateDetailsRef.current.open = false;
-              }
-            }}
-          >
-            <summary className="px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100 font-medium text-gray-700 list-none">
-              <div className="flex items-center justify-between">
+          {/* Filter Pills Row */}
+          <div className="flex flex-wrap gap-2">
+            {/* Authorisation Date Filter */}
+            <details 
+              ref={authDateDetailsRef}
+              className="relative"
+              onToggle={(e) => {
+                if (e.target.open) {
+                  setTimeout(() => {
+                    const firstDateInput = e.target.querySelector('input[type="text"][name="auth_date_from"]');
+                    if (firstDateInput) firstDateInput.focus();
+                  }, 10);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && authDateDetailsRef.current?.open) {
+                  e.preventDefault();
+                  authDateDetailsRef.current.open = false;
+                }
+              }}
+            >
+              <summary className={`
+                flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium cursor-pointer
+                transition-all duration-150 list-none
+                focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+                ${(filters.auth_date_from || filters.auth_date_to)
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                }
+              `}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
                 <span>Authorisation / notification date</span>
-                <span className="text-sm font-normal text-gray-500">
-                  {filters.auth_date_from || filters.auth_date_to
-                    ? `${filters.auth_date_from || '...'} - ${filters.auth_date_to || '...'}`
-                    : 'Click to select'}
-                </span>
-              </div>
-            </summary>
-            <div className="p-3 bg-white border-t border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Date From */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    From
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={authDateFromInput}
-                      onChange={(e) => setAuthDateFromInput(e.target.value)}
-                      onBlur={() => {
-                        // When user leaves the field, try to parse and format the date
-                        const value = authDateFromInput.trim();
-                        if (!value) {
-                          handleChange('auth_date_from', null);
-                          return;
-                        }
-                        
-                        const parsed = parseDateFromInput(value);
-                        if (parsed) {
-                          const displayValue = formatDateForDisplay(parsed);
-                          setAuthDateFromInput(displayValue);
-                          handleChange('auth_date_from', parsed);
-                        } else {
-                          handleChange('auth_date_from', null);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape' && authDateDetailsRef.current) {
-                          e.preventDefault();
-                          authDateDetailsRef.current.open = false;
-                        } else if (e.key === 'Enter') {
-                          e.preventDefault();
+                <svg 
+                  className={`w-4 h-4 transition-transform ${authDateDetailsRef.current?.open ? 'rotate-180' : ''}`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="absolute top-full left-0 mt-2 w-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Date From */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      From
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="auth_date_from"
+                        value={authDateFromInput}
+                        onChange={(e) => setAuthDateFromInput(e.target.value)}
+                        onBlur={() => {
                           const value = authDateFromInput.trim();
-                          
                           if (!value) {
                             handleChange('auth_date_from', null);
                             return;
                           }
-                          
                           const parsed = parseDateFromInput(value);
                           if (parsed) {
                             const displayValue = formatDateForDisplay(parsed);
                             setAuthDateFromInput(displayValue);
                             handleChange('auth_date_from', parsed);
+                          } else {
+                            handleChange('auth_date_from', null);
                           }
-                          
-                          // Move focus to "To" field
-                          const toInput = authDateDetailsRef.current?.querySelector('input[type="text"][name="auth_date_to"]');
-                          if (toInput) {
-                            setTimeout(() => toInput.focus(), 10);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape' && authDateDetailsRef.current) {
+                            e.preventDefault();
+                            authDateDetailsRef.current.open = false;
+                          } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const value = authDateFromInput.trim();
+                            if (!value) {
+                              handleChange('auth_date_from', null);
+                              return;
+                            }
+                            const parsed = parseDateFromInput(value);
+                            if (parsed) {
+                              const displayValue = formatDateForDisplay(parsed);
+                              setAuthDateFromInput(displayValue);
+                              handleChange('auth_date_from', parsed);
+                            }
+                            const toInput = authDateDetailsRef.current?.querySelector('input[type="text"][name="auth_date_to"]');
+                            if (toInput) {
+                              setTimeout(() => toInput.focus(), 10);
+                            }
                           }
-                        }
-                      }}
-                      placeholder="DD-MM-YYYY"
-                      className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <input
-                      ref={authDateFromDateInputRef}
-                      type="date"
-                      value={filters.auth_date_from || ''}
-                      onChange={(e) => {
-                        const value = e.target.value || null;
-                        if (value) {
-                          const displayValue = formatDateForDisplay(value);
-                          setAuthDateFromInput(displayValue);
-                        } else {
-                          setAuthDateFromInput('');
-                        }
-                        handleChange('auth_date_from', value);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape' && authDateDetailsRef.current) {
+                        }}
+                        placeholder="DD-MM-YYYY"
+                        className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <input
+                        ref={authDateFromDateInputRef}
+                        type="date"
+                        value={filters.auth_date_from || ''}
+                        onChange={(e) => {
+                          const value = e.target.value || null;
+                          setAuthDateFromInput(formatDateForDisplay(value) || '');
+                          handleChange('auth_date_from', value);
+                        }}
+                        className="absolute right-0 top-0 h-full w-10 opacity-0 pointer-events-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
                           e.preventDefault();
-                          authDateDetailsRef.current.open = false;
-                        } else if (e.key === 'Enter') {
-                          e.preventDefault();
-                          // Move focus to "To" field
-                          const toInput = authDateDetailsRef.current?.querySelector('input[type="text"][name="auth_date_to"]');
-                          if (toInput) {
-                            setTimeout(() => toInput.focus(), 10);
+                          if (authDateFromDateInputRef.current) {
+                            authDateFromDateInputRef.current.showPicker?.();
                           }
-                        }
-                      }}
-                      className="absolute right-0 top-0 h-full w-10 opacity-0 pointer-events-none"
-                      title="Use calendar picker"
-                    />
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (authDateFromDateInputRef.current) {
-                          authDateFromDateInputRef.current.showPicker?.();
-                        }
-                      }}
-                      className="absolute right-0 top-0 h-full px-3 flex items-center justify-center text-gray-400 hover:text-gray-600 z-10"
-                      title="Open calendar"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </button>
+                        }}
+                        className="absolute right-0 top-0 h-full px-3 flex items-center justify-center text-gray-400 hover:text-gray-600 z-10"
+                        title="Open calendar"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                </div>
-                
-                {/* Date To */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    To
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      name="auth_date_to"
-                      value={authDateToInput}
-                      onChange={(e) => setAuthDateToInput(e.target.value)}
-                      onBlur={() => {
-                        // When user leaves the field, try to parse and format the date
-                        const value = authDateToInput.trim();
-                        if (!value) {
-                          handleChange('auth_date_to', null);
-                          return;
-                        }
-                        
-                        // Parse the input
-                        let parsed = parseDateFromInput(value);
-                        
-                        // If only year (YYYY), fill with 12-31
-                        if (/^\d{4}$/.test(value)) {
-                          parsed = `${value}-12-31`;
-                        }
-                        // If YYYY-MM, fill with last day of month
-                        else if (/^\d{4}-\d{2}$/.test(value)) {
-                          const [year, month] = value.split('-');
-                          const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-                          parsed = `${value}-${String(lastDay).padStart(2, '0')}`;
-                        }
-                        
-                        if (parsed) {
-                          const displayValue = formatDateForDisplay(parsed);
-                          setAuthDateToInput(displayValue);
-                          handleChange('auth_date_to', parsed);
-                        } else {
-                          handleChange('auth_date_to', null);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape' && authDateDetailsRef.current) {
-                          e.preventDefault();
-                          authDateDetailsRef.current.open = false;
-                        } else if (e.key === 'Enter') {
-                          e.preventDefault();
+                  
+                  {/* Date To */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      To
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="auth_date_to"
+                        value={authDateToInput}
+                        onChange={(e) => setAuthDateToInput(e.target.value)}
+                        onBlur={() => {
                           const value = authDateToInput.trim();
-                          
                           if (!value) {
                             handleChange('auth_date_to', null);
                             return;
                           }
-                          
-                          // Parse the input
                           let parsed = parseDateFromInput(value);
-                          
-                          // If only year (YYYY), fill with 12-31
                           if (/^\d{4}$/.test(value)) {
                             parsed = `${value}-12-31`;
-                          }
-                          // If YYYY-MM, fill with last day of month
-                          else if (/^\d{4}-\d{2}$/.test(value)) {
+                          } else if (/^\d{4}-\d{2}$/.test(value)) {
                             const [year, month] = value.split('-');
                             const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
                             parsed = `${value}-${String(lastDay).padStart(2, '0')}`;
                           }
-                          
                           if (parsed) {
                             const displayValue = formatDateForDisplay(parsed);
                             setAuthDateToInput(displayValue);
                             handleChange('auth_date_to', parsed);
+                          } else {
+                            handleChange('auth_date_to', null);
                           }
-                          
-                          // Close the filter on Enter
-                          if (authDateDetailsRef.current) {
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape' && authDateDetailsRef.current) {
+                            e.preventDefault();
                             authDateDetailsRef.current.open = false;
+                          } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const value = authDateToInput.trim();
+                            if (!value) {
+                              handleChange('auth_date_to', null);
+                              return;
+                            }
+                            let parsed = parseDateFromInput(value);
+                            if (/^\d{4}$/.test(value)) {
+                              parsed = `${value}-12-31`;
+                            } else if (/^\d{4}-\d{2}$/.test(value)) {
+                              const [year, month] = value.split('-');
+                              const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+                              parsed = `${value}-${String(lastDay).padStart(2, '0')}`;
+                            }
+                            if (parsed) {
+                              const displayValue = formatDateForDisplay(parsed);
+                              setAuthDateToInput(displayValue);
+                              handleChange('auth_date_to', parsed);
+                            }
+                            if (authDateDetailsRef.current) {
+                              authDateDetailsRef.current.open = false;
+                            }
                           }
-                        }
-                      }}
-                      placeholder="DD-MM-YYYY"
-                      className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <input
-                      ref={authDateToDateInputRef}
-                      type="date"
-                      value={filters.auth_date_to || ''}
-                      onChange={(e) => {
-                        const value = e.target.value || null;
-                        if (value) {
-                          const displayValue = formatDateForDisplay(value);
-                          setAuthDateToInput(displayValue);
-                        } else {
-                          setAuthDateToInput('');
-                        }
-                        handleChange('auth_date_to', value);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape' && authDateDetailsRef.current) {
+                        }}
+                        placeholder="DD-MM-YYYY"
+                        className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <input
+                        ref={authDateToDateInputRef}
+                        type="date"
+                        value={filters.auth_date_to || ''}
+                        onChange={(e) => {
+                          const value = e.target.value || null;
+                          setAuthDateToInput(formatDateForDisplay(value) || '');
+                          handleChange('auth_date_to', value);
+                        }}
+                        className="absolute right-0 top-0 h-full w-10 opacity-0 pointer-events-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
                           e.preventDefault();
-                          authDateDetailsRef.current.open = false;
-                        } else if (e.key === 'Enter') {
-                          e.preventDefault();
-                          // Close the filter on Enter
-                          if (authDateDetailsRef.current) {
-                            authDateDetailsRef.current.open = false;
+                          if (authDateToDateInputRef.current) {
+                            authDateToDateInputRef.current.showPicker?.();
                           }
-                        }
-                      }}
-                      className="absolute right-0 top-0 h-full w-10 opacity-0 pointer-events-none"
-                      title="Use calendar picker"
-                    />
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (authDateToDateInputRef.current) {
-                          authDateToDateInputRef.current.showPicker?.();
-                        }
-                      }}
-                      className="absolute right-0 top-0 h-full px-3 flex items-center justify-center text-gray-400 hover:text-gray-600 z-10"
-                      title="Open calendar"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </button>
+                        }}
+                        className="absolute right-0 top-0 h-full px-3 flex items-center justify-center text-gray-400 hover:text-gray-600 z-10"
+                        title="Open calendar"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
+                
+                {(filters.auth_date_from || filters.auth_date_to) && (
+                  <button
+                    onClick={() => {
+                      setAuthDateFromInput('');
+                      setAuthDateToInput('');
+                      handleChange('auth_date_from', null);
+                      handleChange('auth_date_to', null);
+                    }}
+                    className="mt-3 text-xs text-primary hover:underline"
+                  >
+                    Clear dates
+                  </button>
+                )}
               </div>
-              
-              {(filters.auth_date_from || filters.auth_date_to) && (
-                <button
-                  onClick={() => {
-                    setAuthDateFromInput('');
-                    setAuthDateToInput('');
-                    handleChange('auth_date_from', null);
-                    handleChange('auth_date_to', null);
-                  }}
-                  className="mt-3 text-xs text-primary hover:underline"
-                >
-                  Clear dates
-                </button>
-              )}
-            </div>
-          </details>
-        </div>
+            </details>
 
-        {/* Home Member State - Multi-select (Collapsible) */}
-        <div className="md:col-span-2">
-          <details 
-            ref={homeMemberStateDetailsRef}
-            className="border border-gray-300 rounded-md"
-            onToggle={(e) => {
-              if (e.target.open && homeMemberStateSearchRef.current) {
-                // Small delay to ensure input is rendered
-                setTimeout(() => {
-                  homeMemberStateSearchRef.current?.focus();
-                }, 10);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' && homeMemberStateDetailsRef.current?.open) {
-                e.preventDefault();
-                homeMemberStateDetailsRef.current.open = false;
-              }
-            }}
-          >
-            <summary className="px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100 font-medium text-gray-700 list-none">
-              <div className="flex items-center justify-between">
+            {/* Home Member State Filter */}
+            <details 
+              ref={homeMemberStateDetailsRef}
+              className="relative"
+              onToggle={(e) => {
+                if (e.target.open && homeMemberStateSearchRef.current) {
+                  setTimeout(() => {
+                    homeMemberStateSearchRef.current?.focus();
+                  }, 10);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && homeMemberStateDetailsRef.current?.open) {
+                  e.preventDefault();
+                  homeMemberStateDetailsRef.current.open = false;
+                }
+              }}
+            >
+              <summary className={`
+                flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium cursor-pointer
+                transition-all duration-150 list-none
+                focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+                ${(filters.home_member_states || []).length > 0
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                }
+              `}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
                 <span>Home Member State</span>
-                <span className="text-sm font-normal text-gray-500">
-                  {(filters.home_member_states || []).length > 0 
-                    ? `${(filters.home_member_states || []).length} selected`
-                    : 'Click to select'}
-                </span>
-              </div>
-            </summary>
-            <div className="p-3 bg-white border-t border-gray-200">
-              {/* Search input */}
-              <input
-                ref={homeMemberStateSearchRef}
-                type="text"
-                value={homeMemberStateSearch}
-                onChange={(e) => setHomeMemberStateSearch(e.target.value)}
-                placeholder="Search countries, authorities..."
-                className="w-full mb-3 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              
-              <div className="max-h-64 overflow-y-auto">
-                {filterOptions.home_member_states === undefined ? (
-                  <div className="text-sm text-gray-500">Loading...</div>
-                ) : !Array.isArray(filterOptions.home_member_states) || filterOptions.home_member_states.length === 0 ? (
-                  <div className="text-sm text-gray-500">No countries available</div>
-                ) : (() => {
-                  // Filter countries/authorities based on search term
-                  const searchTerm = homeMemberStateSearch.toLowerCase();
-                  const filteredCountries = filterOptions.home_member_states
-                    .map(country => {
-                      const countryName = COUNTRY_NAMES[country.country_code] || country.country_code;
-                      const filteredAuthorities = country.authorities.filter(authority => {
-                        const authName = typeof authority === 'string' ? authority : authority.name;
-                        const authAbbr = typeof authority === 'object' && authority.abbreviation 
-                          ? authority.abbreviation 
-                          : (authName.match(/\(([^)]+)\)/) ? authName.match(/\(([^)]+)\)/)[1] : null);
+                {(filters.home_member_states || []).length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-white/20">
+                    {(filters.home_member_states || []).length}
+                  </span>
+                )}
+                <svg 
+                  className={`w-4 h-4 transition-transform ${homeMemberStateDetailsRef.current?.open ? 'rotate-180' : ''}`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="absolute top-full left-0 mt-2 w-96 max-h-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col">
+                <div className="p-3 border-b border-gray-200">
+                  <input
+                    ref={homeMemberStateSearchRef}
+                    type="text"
+                    value={homeMemberStateSearch}
+                    onChange={(e) => setHomeMemberStateSearch(e.target.value)}
+                    placeholder="Search countries, authorities..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape' && homeMemberStateDetailsRef.current?.open) {
+                        e.preventDefault();
+                        homeMemberStateDetailsRef.current.open = false;
+                      }
+                    }}
+                  />
+                </div>
+                <div className="overflow-y-auto p-3">
+                  {filterOptions.home_member_states === undefined ? (
+                    <div className="text-sm text-gray-500">Loading...</div>
+                  ) : !Array.isArray(filterOptions.home_member_states) || filterOptions.home_member_states.length === 0 ? (
+                    <div className="text-sm text-gray-500">No countries available</div>
+                  ) : (() => {
+                    const searchTerm = homeMemberStateSearch.toLowerCase();
+                    const filteredCountries = filterOptions.home_member_states
+                      .map(country => {
+                        const countryName = COUNTRY_NAMES[country.country_code] || country.country_code;
+                        const filteredAuthorities = country.authorities.filter(authority => {
+                          const authName = typeof authority === 'string' ? authority : authority.name;
+                          const authAbbr = typeof authority === 'object' && authority.abbreviation 
+                            ? authority.abbreviation 
+                            : (authName.match(/\(([^)]+)\)/) ? authName.match(/\(([^)]+)\)/)[1] : null);
+                          
+                          if (!searchTerm) return true;
+                          
+                          return (
+                            countryName.toLowerCase().includes(searchTerm) ||
+                            country.country_code.toLowerCase().includes(searchTerm) ||
+                            authName.toLowerCase().includes(searchTerm) ||
+                            (authAbbr && authAbbr.toLowerCase().includes(searchTerm))
+                          );
+                        });
                         
-                        if (!searchTerm) return true;
-                        
-                        return (
-                          countryName.toLowerCase().includes(searchTerm) ||
-                          country.country_code.toLowerCase().includes(searchTerm) ||
-                          authName.toLowerCase().includes(searchTerm) ||
-                          (authAbbr && authAbbr.toLowerCase().includes(searchTerm))
-                        );
-                      });
-                      
-                      return filteredAuthorities.length > 0 
-                        ? { ...country, authorities: filteredAuthorities }
-                        : null;
-                    })
-                    .filter(Boolean);
-                  
-                  if (filteredCountries.length === 0) {
-                    return <div className="text-sm text-gray-500">No results found</div>;
-                  }
-                  
-                  return (
-                    <>
-                      <div className="grid grid-cols-1 gap-2">
+                        return filteredAuthorities.length > 0 
+                          ? { ...country, authorities: filteredAuthorities }
+                          : null;
+                      })
+                      .filter(Boolean);
+                    
+                    if (filteredCountries.length === 0) {
+                      return <div className="text-sm text-gray-500">No results found</div>;
+                    }
+                    
+                    return (
+                      <div className="space-y-2">
                         {filteredCountries.map(country => {
                           const countryName = COUNTRY_NAMES[country.country_code] || country.country_code;
+                          const count = filterCounts.country_counts[country.country_code] !== undefined 
+                            ? filterCounts.country_counts[country.country_code] 
+                            : 0;
                           return country.authorities.map((authority, idx) => {
                             const authName = typeof authority === 'string' ? authority : authority.name;
                             const authAbbr = typeof authority === 'object' && authority.abbreviation 
@@ -621,7 +640,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters }) {
                                 <span className="text-sm flex-1">
                                   {getCountryFlag(country.country_code)} {countryName} - {displayName}
                                   <span className="ml-2 text-gray-500">
-                                    ({filterCounts.country_counts[country.country_code] || 0})
+                                    ({count})
                                   </span>
                                 </span>
                               </label>
@@ -629,95 +648,110 @@ export function Filters({ filters, onFiltersChange, onClearFilters }) {
                           });
                         })}
                       </div>
-                    </>
-                  );
-                })()}
-              </div>
-              {(filters.home_member_states || []).length > 0 && (
-                <button
-                  onClick={() => handleChange('home_member_states', [])}
-                  className="mt-2 text-xs text-primary hover:underline"
-                >
-                  Clear selection
-                </button>
-              )}
-            </div>
-          </details>
-        </div>
-
-        {/* Crypto-asset Services - Multi-select (Collapsible) */}
-        <div className="md:col-span-2">
-          <details 
-            ref={cryptoServicesDetailsRef}
-            className="border border-gray-300 rounded-md"
-            onToggle={(e) => {
-              if (e.target.open && cryptoServicesSearchRef.current) {
-                // Small delay to ensure input is rendered
-                setTimeout(() => {
-                  cryptoServicesSearchRef.current?.focus();
-                }, 10);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' && cryptoServicesDetailsRef.current?.open) {
-                e.preventDefault();
-                cryptoServicesDetailsRef.current.open = false;
-              }
-            }}
-          >
-            <summary className="px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100 font-medium text-gray-700 list-none">
-              <div className="flex items-center justify-between">
-                <span>Crypto-asset services</span>
-                <span className="text-sm font-normal text-gray-500">
-                  {(filters.service_codes || []).length > 0 
-                    ? `${(filters.service_codes || []).length} selected`
-                    : 'Click to select'}
-                </span>
-              </div>
-            </summary>
-            <div className="p-3 bg-white border-t border-gray-200">
-              {/* Search input */}
-              <input
-                ref={cryptoServicesSearchRef}
-                type="text"
-                value={cryptoServicesSearch}
-                onChange={(e) => setCryptoServicesSearch(e.target.value)}
-                placeholder="Search services..."
-                className="w-full mb-3 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              
-              <div className="max-h-96 overflow-y-auto">
-                {filterOptions.service_codes === undefined ? (
-                  <div className="text-sm text-gray-500">Loading service codes...</div>
-                ) : !Array.isArray(filterOptions.service_codes) || filterOptions.service_codes.length === 0 ? (
-                  <div className="text-sm text-gray-500">
-                    No service codes available
-                    {process.env.NODE_ENV === 'development' && (
-                      <div className="text-xs mt-1 text-gray-400">
-                        Debug: {JSON.stringify(filterOptions.service_codes)}
-                      </div>
-                    )}
+                    );
+                  })()}
+                </div>
+                {(filters.home_member_states || []).length > 0 && (
+                  <div className="p-3 border-t border-gray-200">
+                    <button
+                      onClick={() => handleChange('home_member_states', [])}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Clear selection
+                    </button>
                   </div>
-                ) : (() => {
-                  // Filter services based on search term
-                  const searchTerm = cryptoServicesSearch.toLowerCase();
-                  const filteredServices = !searchTerm
-                    ? filterOptions.service_codes
-                    : filterOptions.service_codes.filter(service =>
-                        service.description.toLowerCase().includes(searchTerm)
-                      );
-                  
-                  if (filteredServices.length === 0) {
-                    return <div className="text-sm text-gray-500">No results found</div>;
-                  }
-                  
-                  return (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                )}
+              </div>
+            </details>
+
+            {/* Crypto-asset Services Filter */}
+            <details 
+              ref={cryptoServicesDetailsRef}
+              className="relative"
+              onToggle={(e) => {
+                if (e.target.open && cryptoServicesSearchRef.current) {
+                  setTimeout(() => {
+                    cryptoServicesSearchRef.current?.focus();
+                  }, 10);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && cryptoServicesDetailsRef.current?.open) {
+                  e.preventDefault();
+                  cryptoServicesDetailsRef.current.open = false;
+                }
+              }}
+            >
+              <summary className={`
+                flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium cursor-pointer
+                transition-all duration-150 list-none
+                focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+                ${(filters.service_codes || []).length > 0
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                }
+              `}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <span>Crypto-asset services</span>
+                {(filters.service_codes || []).length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-white/20">
+                    {(filters.service_codes || []).length}
+                  </span>
+                )}
+                <svg 
+                  className={`w-4 h-4 transition-transform ${cryptoServicesDetailsRef.current?.open ? 'rotate-180' : ''}`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="absolute top-full left-0 mt-2 w-96 max-h-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col">
+                <div className="p-3 border-b border-gray-200">
+                  <input
+                    ref={cryptoServicesSearchRef}
+                    type="text"
+                    value={cryptoServicesSearch}
+                    onChange={(e) => setCryptoServicesSearch(e.target.value)}
+                    placeholder="Search services..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape' && cryptoServicesDetailsRef.current?.open) {
+                        e.preventDefault();
+                        cryptoServicesDetailsRef.current.open = false;
+                      }
+                    }}
+                  />
+                </div>
+                <div className="overflow-y-auto p-3">
+                  {filterOptions.service_codes === undefined ? (
+                    <div className="text-sm text-gray-500">Loading service codes...</div>
+                  ) : !Array.isArray(filterOptions.service_codes) || filterOptions.service_codes.length === 0 ? (
+                    <div className="text-sm text-gray-500">No service codes available</div>
+                  ) : (() => {
+                    const searchTerm = cryptoServicesSearch.toLowerCase();
+                    const filteredServices = !searchTerm
+                      ? filterOptions.service_codes
+                      : filterOptions.service_codes.filter(service =>
+                          service.description.toLowerCase().includes(searchTerm)
+                        );
+                    
+                    if (filteredServices.length === 0) {
+                      return <div className="text-sm text-gray-500">No results found</div>;
+                    }
+                    
+                    return (
+                      <div className="space-y-2">
                         {filteredServices
                           .sort((a, b) => getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code))
                           .map(service => {
                             const capitalizedDescription = getServiceDescriptionCapitalized(service.code);
+                            const count = filterCounts.service_counts[service.code] !== undefined 
+                              ? filterCounts.service_counts[service.code] 
+                              : 0;
                             return (
                               <label
                                 key={service.code}
@@ -732,31 +766,31 @@ export function Filters({ filters, onFiltersChange, onClearFilters }) {
                                 <span className="text-sm flex-1">
                                   {capitalizedDescription}
                                   <span className="ml-2 text-gray-500">
-                                    ({filterCounts.service_counts[service.code] || 0})
+                                    ({count})
                                   </span>
                                 </span>
                               </label>
                             );
                           })}
                       </div>
-                      {(filters.service_codes || []).length > 0 && (
-                        <button
-                          onClick={() => handleChange('service_codes', [])}
-                          className="mt-2 text-xs text-primary hover:underline"
-                        >
-                          Clear selection
-                        </button>
-                      )}
-                    </>
-                  );
-                })()}
+                    );
+                  })()}
+                </div>
+                {(filters.service_codes || []).length > 0 && (
+                  <div className="p-3 border-t border-gray-200">
+                    <button
+                      onClick={() => handleChange('service_codes', [])}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Clear selection
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          </details>
+            </details>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
-
-
