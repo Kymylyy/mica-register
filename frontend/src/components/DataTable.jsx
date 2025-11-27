@@ -179,28 +179,35 @@ export function DataTable({ data, onRowClick }) {
 
   return (
     <div className="relative">
-      {/* Column visibility toggle - right-aligned ghost button */}
-      <div className="mb-2 flex justify-end">
+      {/* Column visibility toggle - styled as filter pill */}
+      <div className="mb-3 flex justify-end">
         <details className="relative">
-          <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded px-3 py-1 flex items-center gap-2 list-none">
+          <summary className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-700 text-sm font-medium cursor-pointer hover:border-sky-300 hover:bg-slate-50 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 list-none">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
             <span>Show/Hide Columns</span>
+            <svg className="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </summary>
-          <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
-            <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
+          <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3">
+            <div className="space-y-2 max-h-80 overflow-y-auto">
               {table.getAllColumns().map(column => {
                 if (column.id === 'select') return null;
+                const columnName = column.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                 return (
-                  <label key={column.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                  <label 
+                    key={column.id} 
+                    className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors"
+                  >
                     <input
                       type="checkbox"
                       checked={column.getIsVisible()}
                       onChange={column.getToggleVisibilityHandler()}
-                      className="rounded border-gray-300 text-primary focus:ring-primary"
+                      className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500 focus:ring-2"
                     />
-                    <span className="text-sm text-gray-700">{column.id.replace(/_/g, ' ')}</span>
+                    <span className="text-sm text-gray-700 font-medium">{columnName}</span>
                   </label>
                 );
               })}
