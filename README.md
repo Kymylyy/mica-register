@@ -128,17 +128,36 @@ The built files will be in `frontend/dist/`
 
 ## Customizing Colors
 
-Edit `frontend/src/index.css` to change the color scheme:
+The project uses a centralized color system based on CSS variables. All colors are defined in `frontend/src/index.css` and automatically mapped to Tailwind classes.
+
+### Quick Color Change
+
+To change the entire color scheme, edit the CSS variables in `frontend/src/index.css`:
 
 ```css
 :root {
-  --color-primary: #3b82f6;      /* Primary blue */
-  --color-secondary: #8b5cf6;    /* Secondary purple */
-  --color-bg: #ffffff;            /* Background */
-  --color-text: #1f2937;         /* Text color */
-  --color-border: #e5e7eb;       /* Border color */
+  --color-primary-500: #3b82f6;  /* Change to your primary color */
+  --color-primary-600: #2563eb;  /* Darker shade */
+  --color-primary-700: #1d4ed8;  /* Even darker */
+  /* ... full scale from 50 to 900 available */
 }
 ```
+
+### Available Color Scales
+
+- `primary` - Main brand/accent color (used for buttons, links, focus states)
+- `secondary` - Alternative accent
+- `sky` - Service badges and light accents
+- `slate` - Neutral UI elements (headers, borders, text)
+- `gray` - Base grays (backgrounds, dividers)
+- `red` - Error/destructive actions
+- `green` - Success states
+
+### Example Palettes
+
+See `frontend/COLOR_PALETTES.md` for example color palettes you can copy and paste to test different schemes (Blue, Purple, Green, Orange, Teal, etc.).
+
+**Note:** The codebase currently uses a mix of direct Tailwind classes and CSS variables. Changing CSS variables will affect all elements using the variable-based classes. For full control, components can be gradually migrated to use the new system.
 
 ## API Endpoints
 
