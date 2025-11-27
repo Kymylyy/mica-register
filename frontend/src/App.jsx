@@ -49,6 +49,14 @@ function App() {
   const [filters, setFilters] = useState({});
   const [copyFeedback, setCopyFeedback] = useState(null);
   const [filtersVisible, setFiltersVisible] = useState(true);
+  const [theme, setTheme] = useState(() => {
+    // Initialize from localStorage or default to 'light'
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme');
+      return saved || 'light';
+    }
+    return 'light';
+  });
   const modalRef = useRef(null);
   const searchDebounceRef = useRef(null);
   const isInitialMount = useRef(true);
@@ -86,6 +94,25 @@ function App() {
       setLoading(false);
     }
   }, [filters]);
+
+  // Initialize theme on mount and sync with data-theme attribute
+  useEffect(() => {
+    const root = document.documentElement;
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    root.setAttribute('data-theme', savedTheme);
+    setTheme(savedTheme);
+  }, []);
+
+  // Toggle theme function
+  const toggleTheme = () => {
+    const root = document.documentElement;
+    const currentTheme = root.getAttribute('data-theme') || 'light';
+    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    root.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('theme', nextTheme);
+    setTheme(nextTheme);
+  };
 
   // Initial fetch on mount
   useEffect(() => {
@@ -233,7 +260,7 @@ function App() {
                         <p className="text-xs uppercase tracking-[0.16em] text-slate-500/60">
                           Feedback / suggest improvement
                         </p>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <ContactPill
                             href="mailto:k.moson@taylorwessing.com"
                             icon={
@@ -255,6 +282,14 @@ function App() {
                           >
                             LinkedIn
                           </ContactPill>
+                          <button
+                            onClick={toggleTheme}
+                            className="px-3 py-1 rounded-full bg-surfaceAlt border border-borderSubtle text-textMuted hover:bg-surfaceElev transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
+                            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                          >
+                            <span className="text-base leading-none">{theme === 'dark' ? '🌚' : '🌞'}</span>
+                          </button>
                         </div>
                       </div>
           </div>
