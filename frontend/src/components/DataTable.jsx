@@ -15,7 +15,7 @@ const columnHelper = createColumnHelper();
 // Presentational component for service tags
 const ServiceTag = ({ serviceCode, fullDescription, shortName }) => (
   <span
-    className="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full cursor-help border border-blue-100"
+    className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full cursor-help border border-blue-100"
     title={fullDescription}
   >
     {shortName}
@@ -43,15 +43,24 @@ export function DataTable({ data, onRowClick }) {
     () => [
       columnHelper.accessor('commercial_name', {
         header: 'Commercial Name',
-        cell: info => info.getValue() || '-',
+        cell: info => {
+          const commercialName = info.getValue();
+          if (commercialName && commercialName.trim()) {
+            return <span className="font-medium">{commercialName}</span>;
+          }
+          // Fallback to lei_name if commercial_name is empty
+          const row = info.row.original;
+          return <span className="font-medium">{row.lei_name || '-'}</span>;
+        },
       }),
       columnHelper.accessor('home_member_state', {
         header: 'Home Member State',
+        size: 180,
         cell: info => {
           const code = info.getValue();
           const flag = getCountryFlag(code);
           return (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {flag && <span>{flag}</span>}
               <span>{code || '-'}</span>
             </div>
@@ -60,6 +69,7 @@ export function DataTable({ data, onRowClick }) {
       }),
       columnHelper.accessor('authorisation_notification_date', {
         header: 'Authorisation / notification date',
+        size: 200,
         cell: info => {
           const date = info.getValue();
           return date ? new Date(date).toLocaleDateString() : '-';
@@ -67,6 +77,7 @@ export function DataTable({ data, onRowClick }) {
       }),
       columnHelper.accessor('services', {
         header: 'Crypto-asset services',
+        size: 400,
         cell: info => {
           const services = info.getValue() || [];
           if (services.length === 0) return '-';
@@ -77,7 +88,7 @@ export function DataTable({ data, onRowClick }) {
           });
           
           return (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1">
               {sortedServices.map((service, idx) => {
                 const fullDescription = getServiceDescription(service.code);
                 const shortName = getServiceShortName(service.code);
@@ -172,7 +183,7 @@ export function DataTable({ data, onRowClick }) {
       {/* Column visibility toggle - right-aligned ghost button */}
       <div className="mb-2 flex justify-end">
         <details className="relative">
-          <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded px-3 py-1.5 flex items-center gap-2 list-none">
+          <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded px-3 py-1 flex items-center gap-2 list-none">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
@@ -200,31 +211,41 @@ export function DataTable({ data, onRowClick }) {
       </div>
 
       {/* Table with sticky header */}
-      <div className="overflow-x-auto border border-gray-200 rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 sticky top-0 z-10">
+      <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm transition-all duration-300 ease-in-out">
+        <table className="min-w-full divide-y divide-gray-200 table-fixed">
+          <thead className="bg-gradient-to-b from-gray-50 to-gray-100 sticky top-0 z-10 shadow-sm">
             {table.getHeaderGroups().map(headerGroup => (
               <tr key={headerGroup.id}>
-                {headerGroup.headers.map(header => (
+                {headerGroup.headers.map((header, headerIndex) => (
                   <th
                     key={header.id}
-                    className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className={`px-3 py-2 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors ${
+                      headerIndex === 0 ? 'sticky left-0 z-20 bg-gradient-to-b from-gray-50 to-gray-100' : ''
+                    }`}
+                    style={{
+                      width: headerIndex === 0 ? '280px' : 
+                             headerIndex === 1 ? '180px' :
+                             headerIndex === 2 ? '200px' :
+                             headerIndex === 3 ? 'auto' : 'auto'
+                    }}
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     <div className="flex items-center gap-2">
                       <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
                       {header.column.getCanSort() && (
-                        <span className="text-gray-400">
+                        <span className={`flex-shrink-0 ${
+                          header.column.getIsSorted() ? 'text-blue-600' : 'text-gray-400'
+                        }`}>
                           {header.column.getIsSorted() === 'asc' ? (
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
                             </svg>
                           ) : header.column.getIsSorted() === 'desc' ? (
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                             </svg>
                           ) : (
-                            <svg className="w-3 h-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                             </svg>
                           )}
@@ -242,13 +263,23 @@ export function DataTable({ data, onRowClick }) {
                 key={row.id}
                 onClick={() => onRowClick && onRowClick(row.original)}
                 className={`
-                  cursor-pointer transition-colors
+                  cursor-pointer transition-all duration-200 ease-in-out
                   ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
                   hover:bg-blue-50
+                  animate-fade-in-row
                 `}
+                style={{
+                  animationDelay: `${Math.min(rowIndex * 15, 200)}ms`,
+                  animationFillMode: 'both'
+                }}
               >
-                {row.getVisibleCells().map(cell => (
-                  <td key={cell.id} className="px-4 py-3 text-sm text-gray-900">
+                {row.getVisibleCells().map((cell, cellIndex) => (
+                  <td 
+                    key={cell.id} 
+                    className={`px-3 py-2 text-sm text-gray-900 ${
+                      cellIndex === 0 ? 'sticky left-0 z-10 bg-inherit font-medium' : ''
+                    }`}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

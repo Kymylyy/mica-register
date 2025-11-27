@@ -170,6 +170,23 @@ def fix_encoding_issues(text):
     return text
 
 
+def normalize_commercial_name(name: Optional[str]) -> Optional[str]:
+    """Normalize commercial name by fixing known errors"""
+    if not name or pd.isna(name):
+        return None
+    
+    name = str(name).strip()
+    if not name:
+        return None
+    
+    # Fix known errors in commercial names
+    # "e Toro" -> "eToro"
+    if name == "e Toro":
+        return "eToro"
+    
+    return name
+
+
 def import_csv_to_db(db: Session, csv_path: str):
     """Import CSV data into database"""
     # Read CSV with proper encoding handling
@@ -264,7 +281,7 @@ def import_csv_to_db(db: Session, csv_path: str):
             lei_name=str(row.get('ae_lei_name', '')).strip() if not pd.isna(row.get('ae_lei_name')) else None,
             lei=str(row.get('ae_lei', '')).strip() if not pd.isna(row.get('ae_lei')) else None,
             lei_cou_code=str(row.get('ae_lei_cou_code', '')).strip() if not pd.isna(row.get('ae_lei_cou_code')) else None,
-            commercial_name=str(row.get('ae_commercial_name', '')).strip() if not pd.isna(row.get('ae_commercial_name')) else None,
+            commercial_name=normalize_commercial_name(row.get('ae_commercial_name')),
             address=str(row.get('ae_address', '')).strip() if not pd.isna(row.get('ae_address')) else None,
             website=str(row.get('ae_website', '')).strip() if not pd.isna(row.get('ae_website')) else None,
             website_platform=str(row.get('ae_website_platform', '')).strip() if not pd.isna(row.get('ae_website_platform')) else None,
