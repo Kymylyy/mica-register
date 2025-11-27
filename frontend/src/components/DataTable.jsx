@@ -277,14 +277,14 @@ export function DataTable({ data, onRowClick, count }) {
       {/* Table with sticky header */}
       <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm transition-all duration-300 ease-in-out">
         <table className="min-w-full divide-y divide-gray-200 table-fixed">
-          <thead className="bg-gradient-to-b from-gray-50 to-gray-100 sticky top-0 z-10 shadow-sm">
+          <thead className="bg-slate-50/60 backdrop-blur-sm sticky top-0 z-10 shadow-sm">
             {table.getHeaderGroups().map(headerGroup => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header, headerIndex) => (
                   <th
                     key={header.id}
-                    className={`px-3 py-2 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors ${
-                      headerIndex === 0 ? 'sticky left-0 z-20 bg-gradient-to-b from-gray-50 to-gray-100' : ''
+                    className={`px-3 py-2 text-left text-[11px] font-semibold text-gray-700 uppercase tracking-wide cursor-pointer hover:bg-gray-200 transition-colors ${
+                      headerIndex === 0 ? 'sticky left-0 z-20 bg-slate-50/60 backdrop-blur-sm' : ''
                     }`}
                     style={{
                       width: headerIndex === 0 ? '280px' : 
