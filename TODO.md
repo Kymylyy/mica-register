@@ -22,6 +22,10 @@
 - [ ] Remove tooltip (question mark cursor and full service name on hover) from service tags in the table
 - [ ] Service tags should not show tooltip on hover
 
+### 5. Show/Hide Columns Options
+- [ ] Improve show/hide columns functionality
+- [ ] Fix or enhance column visibility options
+
 ---
 
 *Last updated: 2025-01-27*
