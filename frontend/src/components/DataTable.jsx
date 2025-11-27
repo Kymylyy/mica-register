@@ -222,22 +222,23 @@ export function DataTable({ data, onRowClick, count }) {
   return (
     <div className="relative">
       {/* Column visibility toggle - styled as filter pill */}
-      <div className="mb-3 flex justify-end items-center gap-2">
+      <div className="mb-3 flex justify-between items-center gap-2">
         {count !== undefined && (
           <span className="text-xs text-gray-600 font-medium">
-            <span className="font-bold text-gray-900">{count}</span> entities
+            <span className="font-bold text-gray-900">{count}</span> ENTITIES
           </span>
         )}
-        {!isDefaultVisibility && (
-          <button
-            onClick={resetToDefault}
-            className="px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1"
-            title="Reset to default columns"
-          >
-            Default
-          </button>
-        )}
-        <details ref={detailsRef} className="relative">
+        <div className="flex items-center gap-2">
+          {!isDefaultVisibility && (
+            <button
+              onClick={resetToDefault}
+              className="px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1"
+              title="Reset to default columns"
+            >
+              Default
+            </button>
+          )}
+          <details ref={detailsRef} className="relative">
           <summary className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-300 bg-white text-gray-700 text-xs font-medium cursor-pointer hover:border-sky-300 hover:bg-slate-50 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 list-none">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -270,6 +271,7 @@ export function DataTable({ data, onRowClick, count }) {
             </div>
           </div>
         </details>
+        </div>
       </div>
 
       {/* Table with sticky header */}
