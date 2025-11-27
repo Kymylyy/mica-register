@@ -23,8 +23,8 @@
 - [x] Service tags should not show tooltip on hover
 
 ### 5. Show/Hide Columns Options
-- [ ] Improve show/hide columns functionality
-- [ ] Fix or enhance column visibility options
+- [x] Improve show/hide columns functionality
+- [x] Fix or enhance column visibility options
 
 ---
 
