@@ -217,6 +217,15 @@ The CSV import process:
 
 This project is for displaying publicly available ESMA data.
 
+## Current Status
+
+The application is in MVP development phase. See `TODO.md` for current tasks and improvements.
+
+### Known Issues / TODO
+- "Last updated" timestamp in header shows placeholder - needs API endpoint
+- Automatic data download from ESMA website not yet implemented
+- Production configuration (CORS, API URLs) needs environment variables
+
 ## Notes
 
 - The database is created automatically on first import

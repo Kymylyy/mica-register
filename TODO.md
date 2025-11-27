@@ -1,25 +1,30 @@
 # TODO
 
-## Future Improvements
+## MVP Ready - Critical Tasks
 
-### 2. Data Updates
+### 1. Last Updated Timestamp
+- [ ] Fix "Last updated: [placeholder]" in header (App.jsx line 233)
+- [ ] Create API endpoint to get the most recent `last_update` date from database
+- [ ] Display actual last update date in header dynamically
+
+### 2. Data Updates & ESMA Integration
 - [ ] Implement automatic data download from ESMA website
+- [ ] Create script/endpoint to fetch CSV from ESMA register URL
 - [ ] Update "Last updated" timestamp dynamically based on data import
 - [ ] Set up scheduled data updates (cron job or similar)
+- [ ] Handle CSV encoding and parsing from ESMA source
 
-### 6. Comments Section
-- [ ] Add comments section from CSV (ac_comments column)
-- [ ] Display comments in the data table or detail view
+## Future Improvements
 
-### 7. Last Update
-- [ ] Add last update field from CSV (ac_lastupdate column)
-- [ ] Display last update timestamp in the UI
+### 3. Error Handling & UX
+- [ ] Add user-facing error messages for API failures
+- [ ] Add "No entities found" message when filters return empty results
+- [ ] Improve error handling in Filters component
 
-### 8. Passported From Filter
-- [ ] Create filter for "passported from" countries (ac_serviceCode_cou column)
-- [ ] Allow filtering by passported countries
-
----
+### 4. Production Configuration
+- [ ] Configure CORS for production domain
+- [ ] Add environment variables for API URL in production
+- [ ] Test production build and deployment
 
 *Last updated: 2025-01-27*
 
