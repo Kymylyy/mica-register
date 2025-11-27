@@ -277,7 +277,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
   const activeFilterCount = getActiveFilterCount();
 
   return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200 mb-3 animate-fade-in">
+    <div className="bg-white rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.04)] border border-gray-200 mb-3 animate-fade-in">
       {/* Card Header */}
       <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
         <div className="flex items-center gap-3">
