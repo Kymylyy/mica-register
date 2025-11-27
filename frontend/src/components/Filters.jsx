@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getCountryFlag } from './FlagIcon';
-import { getServiceDescriptionCapitalized, getServiceCodeOrder } from '../utils/serviceDescriptions';
+import { getServiceDescriptionCapitalized, getServiceCodeOrder, getServiceShortName, getServiceDescription } from '../utils/serviceDescriptions';
 
 // Country code to full English name mapping
 const COUNTRY_NAMES = {
@@ -110,7 +110,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
           ...response.data,
           service_codes: sortedServiceCodes.map(s => ({
             ...s,
-            description: getServiceDescriptionCapitalized(s.code) // Capitalize for display
+            description: getServiceShortName(s.code) // Use short names like in table
           }))
         });
       })
@@ -193,6 +193,33 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
       });
   }, [filters.search, filters.home_member_states, filters.auth_date_from, filters.auth_date_to]);
 
+  // Close details when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside any details element
+      const clickedElement = event.target;
+      const isInsideDetails = clickedElement.closest('details');
+      
+      if (!isInsideDetails) {
+        // Close all details elements
+        if (authDateDetailsRef.current?.open) {
+          authDateDetailsRef.current.open = false;
+        }
+        if (homeMemberStateDetailsRef.current?.open) {
+          homeMemberStateDetailsRef.current.open = false;
+        }
+        if (cryptoServicesDetailsRef.current?.open) {
+          cryptoServicesDetailsRef.current.open = false;
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const handleChange = (key, value) => {
     onFiltersChange({ ...filters, [key]: value });
   };
@@ -203,6 +230,8 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
       ? currentCodes.filter(c => c !== code)
       : [...currentCodes, code];
     handleChange('service_codes', newCodes);
+    // Clear search field after selection
+    setCryptoServicesSearch('');
   };
 
   const handleHomeMemberStateToggle = (countryCode) => {
@@ -211,6 +240,29 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
       ? currentStates.filter(c => c !== countryCode)
       : [...currentStates, countryCode];
     handleChange('home_member_states', newStates);
+    // Clear search field after selection
+    setHomeMemberStateSearch('');
+  };
+
+  const handleRemoveHomeMemberState = (countryCode) => {
+    const currentStates = filters.home_member_states || [];
+    handleChange('home_member_states', currentStates.filter(c => c !== countryCode));
+  };
+
+  const handleRemoveServiceCode = (code) => {
+    const currentCodes = filters.service_codes || [];
+    handleChange('service_codes', currentCodes.filter(c => c !== code));
+  };
+
+  const handleRemoveDateFilter = () => {
+    setAuthDateFromInput('');
+    setAuthDateToInput('');
+    handleChange('auth_date_from', null);
+    handleChange('auth_date_to', null);
+  };
+
+  const handleRemoveSearch = () => {
+    handleChange('search', '');
   };
 
   // Get active filter count for display
@@ -222,31 +274,42 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
     return count;
   };
 
+  const activeFilterCount = getActiveFilterCount();
+
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div className="bg-white rounded-lg shadow-md border border-gray-200 mb-3 animate-fade-in">
       {/* Card Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-200">
-        <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Filters</h2>
+      <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wide">Filters</h2>
+          {activeFilterCount > 0 && (
+            <span className="px-2.5 py-0.5 bg-blue-600 text-white text-xs font-bold rounded-full">
+              {activeFilterCount}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleVisibility}
-            className="text-sm text-gray-600 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded px-2 py-1"
+            className="text-sm text-gray-600 hover:text-gray-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded px-3 py-1.5 hover:bg-gray-100"
             aria-label={isVisible ? 'Hide filters' : 'Show filters'}
           >
             {isVisible ? 'Hide filters' : 'Show filters'}
           </button>
-          <button
-            onClick={onClearFilters}
-            className="text-sm text-gray-600 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded px-2 py-1"
-            aria-label="Clear all filters"
-          >
-            Clear all
-          </button>
+          {activeFilterCount > 0 && (
+            <button
+              onClick={onClearFilters}
+              className="text-sm text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded px-3 py-1.5 font-medium"
+              aria-label="Clear all filters"
+            >
+              Clear all
+            </button>
+          )}
         </div>
       </div>
 
       {isVisible && (
-        <div className="p-4 space-y-4">
+        <div className="p-3 space-y-3 animate-slide-down">
           {/* Search Bar */}
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -259,7 +322,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
               value={filters.search || ''}
               onChange={(e) => handleChange('search', e.target.value)}
               placeholder="Search by anything..."
-              className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full pl-10 pr-10 py-2 text-sm border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-gray-400"
               aria-label="Search entities"
             />
             {filters.search && (
@@ -275,8 +338,103 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
             )}
           </div>
 
+          {/* Active Filters Chips */}
+          {(filters.search || 
+            (filters.home_member_states && filters.home_member_states.length > 0) ||
+            (filters.service_codes && filters.service_codes.length > 0) ||
+            filters.auth_date_from || filters.auth_date_to) && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide mr-1">Active filters:</span>
+              
+              {/* Search filter chip */}
+              {filters.search && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium border border-blue-200">
+                  <span>"{filters.search}"</span>
+                  <button
+                    onClick={handleRemoveSearch}
+                    className="ml-1 text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                    aria-label="Remove search filter"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
+              {/* Home Member States chips */}
+              {filters.home_member_states && filters.home_member_states.length > 0 && 
+                filters.home_member_states.map(countryCode => {
+                  const countryName = COUNTRY_NAMES[countryCode] || countryCode;
+                  return (
+                    <div key={countryCode} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium border border-blue-200">
+                      {getCountryFlag(countryCode) && <span>{getCountryFlag(countryCode)}</span>}
+                      <span>{countryName}</span>
+                      <button
+                        onClick={() => handleRemoveHomeMemberState(countryCode)}
+                        className="ml-1 text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                        aria-label={`Remove ${countryName} filter`}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })
+              }
+
+              {/* Service Codes chips */}
+              {filters.service_codes && filters.service_codes.length > 0 && 
+                filters.service_codes.map(code => {
+                  const shortName = getServiceShortName(code);
+                  const fullDescription = getServiceDescription(code);
+                  return (
+                    <div key={code} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium border border-blue-200" title={fullDescription}>
+                      <span className="max-w-xs truncate">{shortName}</span>
+                      <button
+                        onClick={() => handleRemoveServiceCode(code)}
+                        className="ml-1 text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors flex-shrink-0"
+                        aria-label={`Remove ${shortName} filter`}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })
+              }
+
+              {/* Date filter chip */}
+              {(filters.auth_date_from || filters.auth_date_to) && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium border border-blue-200">
+                  <span>
+                    {filters.auth_date_from && filters.auth_date_to
+                      ? `${formatDateForDisplay(filters.auth_date_from)} - ${formatDateForDisplay(filters.auth_date_to)}`
+                      : filters.auth_date_from
+                      ? `From ${formatDateForDisplay(filters.auth_date_from)}`
+                      : `To ${formatDateForDisplay(filters.auth_date_to)}`}
+                  </span>
+                  <button
+                    onClick={handleRemoveDateFilter}
+                    className="ml-1 text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                    aria-label="Remove date filter"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Separator */}
+          <div className="border-t border-gray-200"></div>
+
           {/* Filter Pills Row */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {/* Authorisation Date Filter */}
             <details 
               ref={authDateDetailsRef}
@@ -297,12 +455,12 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
               }}
             >
               <summary className={`
-                flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium cursor-pointer
-                transition-all duration-150 list-none
+                flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold cursor-pointer
+                transition-all duration-200 list-none
                 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
                 ${(filters.auth_date_from || filters.auth_date_to)
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md hover:shadow-lg hover:from-blue-700 hover:to-blue-800'
+                  : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700'
                 }
               `}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -318,7 +476,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </summary>
-              <div className="absolute top-full left-0 mt-2 w-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
+              <div className="absolute top-full left-0 mt-2 w-96 bg-white border-2 border-gray-200 rounded-lg shadow-xl z-50 p-4 animate-slide-down">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Date From */}
                   <div>
@@ -531,12 +689,12 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
               }}
             >
               <summary className={`
-                flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium cursor-pointer
-                transition-all duration-150 list-none
+                flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold cursor-pointer
+                transition-all duration-200 list-none
                 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
                 ${(filters.home_member_states || []).length > 0
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md hover:shadow-lg hover:from-blue-700 hover:to-blue-800'
+                  : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700'
                 }
               `}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -558,14 +716,14 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                 </svg>
               </summary>
               <div className="absolute top-full left-0 mt-2 w-96 max-h-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col">
-                <div className="p-3 border-b border-gray-200">
+                <div className="p-3 border-b-2 border-gray-200">
                   <input
                     ref={homeMemberStateSearchRef}
                     type="text"
                     value={homeMemberStateSearch}
                     onChange={(e) => setHomeMemberStateSearch(e.target.value)}
                     placeholder="Search countries, authorities..."
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary hover:border-gray-400 transition-all"
                     onKeyDown={(e) => {
                       if (e.key === 'Escape' && homeMemberStateDetailsRef.current?.open) {
                         e.preventDefault();
@@ -683,12 +841,12 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
               }}
             >
               <summary className={`
-                flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium cursor-pointer
-                transition-all duration-150 list-none
+                flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold cursor-pointer
+                transition-all duration-200 list-none
                 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
                 ${(filters.service_codes || []).length > 0
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md hover:shadow-lg hover:from-blue-700 hover:to-blue-800'
+                  : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700'
                 }
               `}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -709,15 +867,15 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </summary>
-              <div className="absolute top-full left-0 mt-2 w-96 max-h-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col">
-                <div className="p-3 border-b border-gray-200">
+              <div className="absolute top-full left-0 mt-2 w-96 max-h-96 bg-white border-2 border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden flex flex-col animate-slide-down">
+                <div className="p-3 border-b-2 border-gray-200">
                   <input
                     ref={cryptoServicesSearchRef}
                     type="text"
                     value={cryptoServicesSearch}
                     onChange={(e) => setCryptoServicesSearch(e.target.value)}
                     placeholder="Search services..."
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary hover:border-gray-400 transition-all"
                     onKeyDown={(e) => {
                       if (e.key === 'Escape' && cryptoServicesDetailsRef.current?.open) {
                         e.preventDefault();
@@ -748,7 +906,8 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                         {filteredServices
                           .sort((a, b) => getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code))
                           .map(service => {
-                            const capitalizedDescription = getServiceDescriptionCapitalized(service.code);
+                            const shortName = getServiceShortName(service.code);
+                            const fullDescription = getServiceDescription(service.code);
                             const count = filterCounts.service_counts[service.code] !== undefined 
                               ? filterCounts.service_counts[service.code] 
                               : 0;
@@ -763,8 +922,8 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                                   onChange={() => handleServiceCodeToggle(service.code)}
                                   className="mt-1 rounded"
                                 />
-                                <span className="text-sm flex-1">
-                                  {capitalizedDescription}
+                                <span className="text-sm flex-1" title={fullDescription}>
+                                  {shortName}
                                   <span className="ml-2 text-gray-500">
                                     ({count})
                                   </span>
