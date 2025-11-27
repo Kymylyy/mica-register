@@ -224,8 +224,8 @@ export function DataTable({ data, onRowClick, count }) {
       {/* Column visibility toggle - styled as filter pill */}
       <div className="mb-3 flex justify-between items-center gap-2">
         {count !== undefined && (
-          <span className="text-xs text-gray-600 font-medium pl-1.5">
-            <span className="font-bold text-gray-900">{count}</span> ENTITIES
+          <span className="text-xs uppercase text-slate-400 tracking-wider pl-1.5">
+            <span className="font-semibold text-slate-600">{count}</span> ENTITIES
           </span>
         )}
         <div className="flex items-center gap-2">
