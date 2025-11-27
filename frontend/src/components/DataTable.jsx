@@ -15,7 +15,7 @@ const columnHelper = createColumnHelper();
 // Presentational component for service tags
 const ServiceTag = ({ serviceCode, fullDescription, shortName }) => (
   <span
-    className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full border border-blue-100"
+    className="px-2.5 py-[3px] text-xs font-medium bg-sky-50 text-sky-700 rounded-full border border-sky-200"
   >
     {shortName}
   </span>
@@ -129,7 +129,7 @@ export function DataTable({ data, onRowClick, count }) {
           });
           
           return (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {sortedServices.map((service, idx) => {
                 const fullDescription = getServiceDescription(service.code);
                 const shortName = getServiceShortName(service.code);
