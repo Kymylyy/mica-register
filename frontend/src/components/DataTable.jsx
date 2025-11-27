@@ -329,7 +329,7 @@ export function DataTable({ data, onRowClick, count }) {
                 className={`
                   cursor-pointer transition-all duration-200 ease-in-out
                   ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-                  hover:bg-blue-50
+                  hover:bg-slate-50
                   animate-fade-in-row
                 `}
                 style={{
