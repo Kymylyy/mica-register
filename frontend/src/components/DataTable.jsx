@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -23,7 +23,9 @@ const ServiceTag = ({ serviceCode, fullDescription, shortName }) => (
 
 export function DataTable({ data, onRowClick }) {
   const [sorting, setSorting] = useState([]);
-  const [columnVisibility, setColumnVisibility] = useState({
+  
+  // Default column visibility
+  const defaultColumnVisibility = {
     commercial_name: true,
     home_member_state: true,
     authorisation_notification_date: true,
@@ -36,7 +38,47 @@ export function DataTable({ data, onRowClick }) {
     competent_authority: false,
     passport_countries: false,
     comments: false,
-  });
+  };
+  
+  const [columnVisibility, setColumnVisibility] = useState(defaultColumnVisibility);
+  const detailsRef = useRef(null);
+  
+  // Check if current visibility matches default
+  const isDefaultVisibility = useMemo(() => {
+    return Object.keys(defaultColumnVisibility).every(
+      key => columnVisibility[key] === defaultColumnVisibility[key]
+    );
+  }, [columnVisibility]);
+  
+  // Reset to default columns
+  const resetToDefault = () => {
+    setColumnVisibility(defaultColumnVisibility);
+  };
+  
+  // Close details when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (detailsRef.current && !detailsRef.current.contains(event.target)) {
+        if (detailsRef.current.open) {
+          detailsRef.current.open = false;
+        }
+      }
+    };
+    
+    const handleEscape = (event) => {
+      if (event.key === 'Escape' && detailsRef.current?.open) {
+        detailsRef.current.open = false;
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   const columns = useMemo(
     () => [
@@ -180,14 +222,23 @@ export function DataTable({ data, onRowClick }) {
   return (
     <div className="relative">
       {/* Column visibility toggle - styled as filter pill */}
-      <div className="mb-3 flex justify-end">
-        <details className="relative">
-          <summary className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-700 text-sm font-medium cursor-pointer hover:border-sky-300 hover:bg-slate-50 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 list-none">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="mb-3 flex justify-end items-center gap-2">
+        {!isDefaultVisibility && (
+          <button
+            onClick={resetToDefault}
+            className="px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1"
+            title="Reset to default columns"
+          >
+            Default
+          </button>
+        )}
+        <details ref={detailsRef} className="relative">
+          <summary className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-300 bg-white text-gray-700 text-xs font-medium cursor-pointer hover:border-sky-300 hover:bg-slate-50 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 list-none">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
             <span>Show/Hide Columns</span>
-            <svg className="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </summary>
