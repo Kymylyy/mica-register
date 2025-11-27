@@ -187,6 +187,64 @@ def normalize_commercial_name(name: Optional[str]) -> Optional[str]:
     return name
 
 
+def is_url(value: Optional[str]) -> bool:
+    """Check if a value looks like a URL"""
+    if not value or pd.isna(value):
+        return False
+    
+    value_str = str(value).strip()
+    if not value_str:
+        return False
+    
+    # Check if it starts with http://, https://, or www.
+    if value_str.startswith(('http://', 'https://', 'www.')):
+        return True
+    
+    # Check if it looks like a domain (contains a dot and looks like a domain)
+    import re
+    # Pattern: starts with alphanumeric, contains dot, ends with valid TLD-like pattern
+    domain_pattern = r'^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,}'
+    if re.match(domain_pattern, value_str):
+        return True
+    
+    return False
+
+
+def fix_address_website_parsing(row: pd.Series) -> tuple[Optional[str], Optional[str]]:
+    """
+    Fix cases where address with comma was incorrectly parsed by CSV reader,
+    causing part of address to appear in website column.
+    
+    This happens when:
+    1. Address contains comma (e.g., "61 rue de Lyon, 75012 Paris")
+    2. CSV parser incorrectly splits it, putting "75012 Paris" in website column
+    3. Website column doesn't look like a URL (no http://, https://, www., or domain pattern)
+    
+    If website doesn't look like URL and address exists, merge them back together.
+    Returns (fixed_address, fixed_website)
+    """
+    address = str(row.get('ae_address', '')).strip() if not pd.isna(row.get('ae_address')) else ''
+    website = str(row.get('ae_website', '')).strip() if not pd.isna(row.get('ae_website')) else ''
+    
+    # If website doesn't look like a URL and address exists, merge them
+    # This handles cases where CSV parser incorrectly split address with comma
+    if website and not is_url(website) and address:
+        # Merge: address + ", " + website
+        # This reconstructs the original address that was incorrectly split
+        fixed_address = f"{address}, {website}"
+        fixed_website = None  # No valid URL, so set to None (will display as "-" in UI)
+        entity_name = str(row.get('ae_commercial_name', 'N/A')).strip() if not pd.isna(row.get('ae_commercial_name')) else 'N/A'
+        print(f"  Fixed address parsing for {entity_name}: merged '{website}' back into address")
+        return (fixed_address, None)
+    
+    # If website looks like URL but address seems incomplete (ends with comma or number),
+    # check if next column might be part of address
+    # This is a more advanced check for edge cases
+    
+    # Return None for empty strings, otherwise return as-is
+    return (address if address else None, website if website else None)
+
+
 def import_csv_to_db(db: Session, csv_path: str):
     """Import CSV data into database"""
     # Read CSV with proper encoding handling
@@ -274,6 +332,9 @@ def import_csv_to_db(db: Session, csv_path: str):
                 seen_countries.add(country_key)
                 countries.append(country)
         
+        # Fix address/website parsing issues (when comma in address causes mis-parsing)
+        fixed_address, fixed_website = fix_address_website_parsing(row)
+        
         # Create entity with relationships
         entity = Entity(
             competent_authority=str(row.get('ae_competentAuthority', '')).strip() if not pd.isna(row.get('ae_competentAuthority')) else None,
@@ -282,8 +343,8 @@ def import_csv_to_db(db: Session, csv_path: str):
             lei=str(row.get('ae_lei', '')).strip() if not pd.isna(row.get('ae_lei')) else None,
             lei_cou_code=str(row.get('ae_lei_cou_code', '')).strip() if not pd.isna(row.get('ae_lei_cou_code')) else None,
             commercial_name=normalize_commercial_name(row.get('ae_commercial_name')),
-            address=str(row.get('ae_address', '')).strip() if not pd.isna(row.get('ae_address')) else None,
-            website=str(row.get('ae_website', '')).strip() if not pd.isna(row.get('ae_website')) else None,
+            address=fixed_address,
+            website=fixed_website,
             website_platform=str(row.get('ae_website_platform', '')).strip() if not pd.isna(row.get('ae_website_platform')) else None,
             authorisation_notification_date=auth_date,
             authorisation_end_date=end_date,

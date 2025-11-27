@@ -37,7 +37,6 @@ export function DataTable({ data, onRowClick, count }) {
     website: false,
     competent_authority: false,
     passport_countries: false,
-    comments: false,
   };
   
   const [columnVisibility, setColumnVisibility] = useState(defaultColumnVisibility);
@@ -110,7 +109,7 @@ export function DataTable({ data, onRowClick, count }) {
       }),
       columnHelper.accessor('authorisation_notification_date', {
         header: 'Authorisation / notification date',
-        size: 200,
+        size: 160,
         cell: info => {
           const date = info.getValue();
           return date ? new Date(date).toLocaleDateString() : '-';
@@ -118,7 +117,7 @@ export function DataTable({ data, onRowClick, count }) {
       }),
       columnHelper.accessor('services', {
         header: 'Crypto-asset services',
-        size: 400,
+        size: 500,
         cell: info => {
           const services = info.getValue() || [];
           if (services.length === 0) return '-';
@@ -160,13 +159,49 @@ export function DataTable({ data, onRowClick, count }) {
       }),
       columnHelper.accessor('website', {
         header: 'Website',
+        size: 250,
         cell: info => {
           const url = info.getValue();
-          return url ? (
-            <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-              {url}
-            </a>
-          ) : '-';
+          if (!url) return '-';
+          
+          // Check if the value looks like a URL (contains http://, https://, www., or domain pattern)
+          const isUrl = /^(https?:\/\/|www\.|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,})/i.test(url.trim());
+          
+          if (!isUrl) {
+            // If it's not a URL, display dash to indicate no website available
+            return '-';
+          }
+          
+          // Handle multiple URLs separated by " | "
+          const urlParts = url.split(' | ');
+          const displayUrls = urlParts.map(part => {
+            let displayUrl = part.trim();
+            // Remove protocol if present
+            displayUrl = displayUrl.replace(/^https?:\/\//i, '');
+            // Remove www. prefix
+            displayUrl = displayUrl.replace(/^www\./i, '');
+            return displayUrl;
+          });
+          const displayUrl = displayUrls.join(' | ');
+          
+          // Ensure href has protocol for proper linking
+          const href = url.startsWith('http://') || url.startsWith('https://') 
+            ? url 
+            : `https://${url}`;
+          
+          return (
+            <div className="max-w-[250px] min-w-0">
+              <a 
+                href={href} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-primary hover:underline break-words text-sm block"
+                title={url}
+              >
+                {displayUrl}
+              </a>
+            </div>
+          );
         },
       }),
       columnHelper.accessor('competent_authority', {
@@ -188,17 +223,6 @@ export function DataTable({ data, onRowClick, count }) {
               ))}
             </div>
           );
-        },
-      }),
-      columnHelper.accessor('comments', {
-        header: 'Comments',
-        cell: info => {
-          const comments = info.getValue();
-          return comments ? (
-            <span className="text-sm text-gray-600" title={comments}>
-              {comments.length > 50 ? comments.substring(0, 50) + '...' : comments}
-            </span>
-          ) : '-';
         },
       }),
     ],
@@ -252,7 +276,9 @@ export function DataTable({ data, onRowClick, count }) {
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {table.getAllColumns().map(column => {
                 if (column.id === 'select') return null;
-                const columnName = column.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                let columnName = column.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                // Ensure LEI is always uppercase
+                columnName = columnName.replace(/\bLei\b/gi, 'LEI');
                 return (
                   <label 
                     key={column.id} 
@@ -287,15 +313,16 @@ export function DataTable({ data, onRowClick, count }) {
                       headerIndex === 0 ? 'sticky left-0 z-20 bg-slate-50/80 backdrop-blur-sm' : ''
                     }`}
                     style={{
-                      width: headerIndex === 0 ? '280px' : 
-                             headerIndex === 1 ? '180px' :
-                             headerIndex === 2 ? '200px' :
-                             headerIndex === 3 ? 'auto' : 'auto'
+                      width: header.column.id === 'commercial_name' ? '280px' :
+                             header.column.id === 'home_member_state' ? '180px' :
+                             header.column.id === 'authorisation_notification_date' ? '160px' :
+                             header.column.id === 'website' ? '250px' :
+                             header.column.id === 'services' ? '500px' : 'auto'
                     }}
                     onClick={header.column.getToggleSortingHandler()}
                   >
-                    <div className="flex items-center gap-2">
-                      <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="flex-1 min-w-0">{flexRender(header.column.columnDef.header, header.getContext())}</span>
                       {header.column.getCanSort() && (
                         <span className={`flex-shrink-0 ${
                           header.column.getIsSorted() ? 'text-blue-600' : 'text-gray-400'

@@ -32,6 +32,23 @@ export const micaServiceShortNames = {
 };
 
 /**
+ * Medium-length service names for modal display
+ * More descriptive than short names, less formal than full MiCA descriptions
+ */
+export const micaServiceMediumNames = {
+  "a": "Custody and administration",
+  "b": "Trading platform operation",
+  "c": "Crypto-to-funds exchange",
+  "d": "Crypto-to-crypto exchange",
+  "e": "Order execution",
+  "f": "Placing of crypto-assets",
+  "g": "Reception and transmission of orders",
+  "h": "Crypto-asset advisory",
+  "i": "Portfolio management",
+  "j": "Transfer services"
+};
+
+/**
  * Get full service description from code
  * @param {string} code - Service code (a-j)
  * @returns {string} Full service description or code if not found
@@ -47,6 +64,15 @@ export function getServiceDescription(code) {
  */
 export function getServiceShortName(code) {
   return micaServiceShortNames[code] || getServiceDescription(code);
+}
+
+/**
+ * Get medium-length service name from code (for modal display)
+ * @param {string} code - Service code (a-j)
+ * @returns {string} Medium service name or short name if not found
+ */
+export function getServiceMediumName(code) {
+  return micaServiceMediumNames[code] || getServiceShortName(code);
 }
 
 /**

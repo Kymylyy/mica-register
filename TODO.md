@@ -2,29 +2,22 @@
 
 ## Future Improvements
 
-### 1. Header Improvements
-- [ ] Work on the header design and layout
-- [ ] Improve header responsiveness
-- [ ] Consider adding more metadata or links
-
 ### 2. Data Updates
 - [ ] Implement automatic data download from ESMA website
 - [ ] Update "Last updated" timestamp dynamically based on data import
 - [ ] Set up scheduled data updates (cron job or similar)
 
-### 3. Color Scheme
-- [ ] Play around with color scheme
-- [ ] Test different color combinations
-- [ ] Ensure accessibility with chosen colors
-- [ ] Update Tailwind config and CSS variables accordingly
+### 6. Comments Section
+- [ ] Add comments section from CSV (ac_comments column)
+- [ ] Display comments in the data table or detail view
 
-### 4. Service Tooltip Removal
-- [x] Remove tooltip (question mark cursor and full service name on hover) from service tags in the table
-- [x] Service tags should not show tooltip on hover
+### 7. Last Update
+- [ ] Add last update field from CSV (ac_lastupdate column)
+- [ ] Display last update timestamp in the UI
 
-### 5. Show/Hide Columns Options
-- [x] Improve show/hide columns functionality
-- [x] Fix or enhance column visibility options
+### 8. Passported From Filter
+- [ ] Create filter for "passported from" countries (ac_serviceCode_cou column)
+- [ ] Allow filtering by passported countries
 
 ---
 
