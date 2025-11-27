@@ -270,13 +270,6 @@ function App() {
           onToggleVisibility={() => setFiltersVisible(!filtersVisible)}
         />
 
-        {/* Results Summary */}
-        <div className="mb-2">
-          <p className="text-sm text-gray-700">
-            Showing <span className="font-bold text-gray-900 text-base">{count}</span> entities
-          </p>
-        </div>
-
         <div className="relative">
           {loading && entities.length === 0 && (
             <div className="text-center py-12">
@@ -285,7 +278,7 @@ function App() {
           )}
           {entities.length > 0 && (
             <div className="transition-opacity duration-300 ease-in-out">
-              <DataTable data={entities} onRowClick={handleRowClick} />
+              <DataTable data={entities} onRowClick={handleRowClick} count={count} />
               {loading && (
                 <div className="absolute top-0 right-0 mt-2 mr-4 z-10">
                   <div className="bg-white rounded-lg shadow-md px-3 py-2 flex items-center gap-2 text-sm text-gray-600 border border-gray-200">
@@ -332,7 +325,7 @@ function App() {
                 {copyFeedback && (
                   <div className="mb-4 p-2 bg-green-100 text-green-800 text-sm rounded text-center">
                     {copyFeedback}
-                  </div>
+      </div>
                 )}
 
                 <div className="space-y-6">

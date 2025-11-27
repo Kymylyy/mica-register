@@ -21,7 +21,7 @@ const ServiceTag = ({ serviceCode, fullDescription, shortName }) => (
   </span>
 );
 
-export function DataTable({ data, onRowClick }) {
+export function DataTable({ data, onRowClick, count }) {
   const [sorting, setSorting] = useState([]);
   
   // Default column visibility
@@ -223,6 +223,11 @@ export function DataTable({ data, onRowClick }) {
     <div className="relative">
       {/* Column visibility toggle - styled as filter pill */}
       <div className="mb-3 flex justify-end items-center gap-2">
+        {count !== undefined && (
+          <span className="text-xs text-gray-600 font-medium">
+            <span className="font-bold text-gray-900">{count}</span> entities
+          </span>
+        )}
         {!isDefaultVisibility && (
           <button
             onClick={resetToDefault}
