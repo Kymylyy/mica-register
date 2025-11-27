@@ -19,8 +19,8 @@
 - [ ] Update Tailwind config and CSS variables accordingly
 
 ### 4. Service Tooltip Removal
-- [ ] Remove tooltip (question mark cursor and full service name on hover) from service tags in the table
-- [ ] Service tags should not show tooltip on hover
+- [x] Remove tooltip (question mark cursor and full service name on hover) from service tags in the table
+- [x] Service tags should not show tooltip on hover
 
 ### 5. Show/Hide Columns Options
 - [ ] Improve show/hide columns functionality
