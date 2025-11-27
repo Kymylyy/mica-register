@@ -291,10 +291,16 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleVisibility}
-            className="text-sm text-gray-600 hover:text-gray-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded px-3 py-1.5 hover:bg-gray-100"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-300 bg-white text-gray-700 text-xs font-medium cursor-pointer hover:border-sky-300 hover:bg-slate-50 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
             aria-label={isVisible ? 'Hide filters' : 'Show filters'}
           >
-            {isVisible ? 'Hide filters' : 'Show filters'}
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            <span>{isVisible ? 'Hide filters' : 'Show filters'}</span>
+            <svg className="w-3.5 h-3.5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
           {activeFilterCount > 0 && (
             <button
