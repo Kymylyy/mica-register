@@ -199,7 +199,7 @@ function App() {
       aria-label={typeof children === 'string' ? children : undefined}
     >
       {icon && <span className="flex-shrink-0 text-slate-500">{icon}</span>}
-      <span>{children}</span>
+      <span className="text-xs">{children}</span>
     </a>
   );
 
