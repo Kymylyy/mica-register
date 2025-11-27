@@ -129,7 +129,7 @@ export function DataTable({ data, onRowClick, count }) {
           });
           
           return (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-[6px]">
               {sortedServices.map((service, idx) => {
                 const fullDescription = getServiceDescription(service.code);
                 const shortName = getServiceShortName(service.code);
