@@ -270,6 +270,8 @@ function App() {
           onToggleVisibility={() => setFiltersVisible(!filtersVisible)}
         />
 
+        <div className="h-px bg-slate-100 my-4" />
+
         <div className="relative">
           {loading && entities.length === 0 && (
             <div className="text-center py-12">
