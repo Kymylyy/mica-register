@@ -4,121 +4,88 @@
 
 :root {
   /* ============================================
-     LAYER 1: RAW COLOR PALETTE
-     Base color definitions - change these to switch entire theme
+     LAYER 1: BASE PALETTE (RGB values)
+     Do NOT override these in dark mode
      ============================================ */
   
-  /* Primary brand color (buttons, links, active states) */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
-  
-  /* Accent color (service badges, highlights) */
-  --color-accent-50: #f0f9ff;
-  --color-accent-100: #e0f2fe;
-  --color-accent-200: #bae6fd;
-  --color-accent-300: #7dd3fc;
-  --color-accent-400: #38bdf8;
-  --color-accent-500: #0ea5e9;
-  --color-accent-600: #0284c7;
-  --color-accent-700: #0369a1;
-  --color-accent-800: #075985;
-  --color-accent-900: #0c4a6e;
-  
-  /* Neutral colors (surfaces, text, borders) */
-  --color-neutral-50: #f8fafc;
-  --color-neutral-100: #f1f5f9;
-  --color-neutral-200: #e2e8f0;
-  --color-neutral-300: #cbd5e1;
-  --color-neutral-400: #94a3b8;
-  --color-neutral-500: #64748b;
-  --color-neutral-600: #475569;
-  --color-neutral-700: #334155;
-  --color-neutral-800: #1e293b;
-  --color-neutral-900: #0f172a;
-  
-  /* Status colors */
-  --color-error-50: #fef2f2;
-  --color-error-100: #fee2e2;
-  --color-error-200: #fecaca;
-  --color-error-500: #ef4444;
-  --color-error-600: #dc2626;
-  --color-error-700: #b91c1c;
-  
-  --color-success-50: #f0fdf4;
-  --color-success-100: #dcfce7;
-  --color-success-500: #22c55e;
-  --color-success-600: #16a34a;
-  
-  /* ============================================
-     LAYER 2: SEMANTIC TOKENS
-     UI meaning - these map to raw colors above
-     Change palette by only updating Layer 1
-     ============================================ */
-  
-  /* Surfaces */
-  --color-surface: #ffffff;
-  --color-surface-subtle: var(--color-neutral-50);
-  --color-surface-muted: var(--color-neutral-100);
-  --color-bg-page: var(--color-neutral-100);
-  
-  /* Text */
-  --color-text-main: var(--color-neutral-900);
-  --color-text-secondary: var(--color-neutral-700);
-  --color-text-muted: var(--color-neutral-500);
-  --color-text-disabled: var(--color-neutral-400);
-  
-  /* Borders & Dividers */
-  --color-border: var(--color-neutral-200);
-  --color-border-subtle: var(--color-neutral-100);
-  --color-divider: var(--color-neutral-100);
-  
-  /* Interactive elements */
-  --color-accent: var(--color-primary-500);
-  --color-accent-hover: var(--color-primary-600);
-  --color-accent-active: var(--color-primary-700);
-  --color-accent-soft: var(--color-primary-50);
-  --color-accent-soft-hover: var(--color-primary-100);
-  
-  /* Badges & Tags */
-  --color-badge-bg: var(--color-accent-50);
-  --color-badge-text: var(--color-accent-700);
-  --color-badge-border: var(--color-accent-200);
-  
-  /* Filter pills */
-  --color-filter-inactive-bg: var(--color-surface);
-  --color-filter-inactive-text: var(--color-text-main);
-  --color-filter-inactive-border: var(--color-neutral-300);
-  --color-filter-inactive-hover-bg: var(--color-accent-soft);
-  --color-filter-inactive-hover-border: var(--color-accent-400);
-  
-  --color-filter-active-bg: var(--color-primary-600);
-  --color-filter-active-text: #ffffff;
-  --color-filter-active-hover: var(--color-primary-700);
-  
-  /* Table */
-  --color-table-header-bg: var(--color-neutral-50);
-  --color-table-row-hover: var(--color-accent-soft);
-  --color-table-row-stripe: var(--color-neutral-50);
-  
-  /* Buttons */
-  --color-button-ghost-bg: var(--color-surface);
-  --color-button-ghost-text: var(--color-text-main);
-  --color-button-ghost-border: var(--color-border);
-  --color-button-ghost-hover-bg: var(--color-surface-subtle);
-  
+  /* Neutral scale */
+  --neutral-50:  250 251 255;
+  --neutral-100: 245 247 252;
+  --neutral-200: 230 233 243;
+  --neutral-300: 214 219 232;
+  --neutral-400: 168 175 186;
+  --neutral-500: 121 129 140;
+  --neutral-600: 82 88 99;
+  --neutral-700: 55 61 73;
+  --neutral-800: 34 38 47;
+  --neutral-900: 17 19 23;
+
+  /* Accent (blue/sky professional) */
+  --accent-50:   239 248 255;
+  --accent-100:  213 235 255;
+  --accent-200:  163 210 255;
+  --accent-300:  115 183 255;
+  --accent-400:  64 152 255;
+  --accent-500:  36 130 255;
+  --accent-600:  18 108 230;
+  --accent-700:  11 77 178;
+  --accent-800:  7 52 128;
+  --accent-900:  5 36 92;
+
   /* Status */
-  --color-error: var(--color-error-600);
-  --color-error-bg: var(--color-error-50);
-  --color-success: var(--color-success-600);
-  --color-success-bg: var(--color-success-50);
+  --success-100: 230 247 236;
+  --success-500: 27 152 98;
+
+  --danger-100: 253 236 238;
+  --danger-500: 220 53 69;
+
+  /* ============================================
+     LAYER 2: SEMANTIC TOKENS (used by UI)
+     These map to base palette above
+     ============================================ */
+
+  /* Backgrounds */
+  --surface:        var(--neutral-50);
+  --surface-alt:    var(--neutral-100);
+  --surface-elev:   var(--neutral-50);
+
+  /* Borders */
+  --border-subtle:  var(--neutral-200);
+  --border-strong:  var(--neutral-300);
+
+  /* Text */
+  --text-main:      var(--neutral-800);
+  --text-muted:     var(--neutral-500);
+  --text-soft:      var(--neutral-400);
+
+  /* Accent semantic */
+  --accent:         var(--accent-500);
+  --accent-bg:      var(--accent-50);
+  --accent-border:   var(--accent-200);
+
+  /* Status semantics */
+  --success:        var(--success-500);
+  --danger:         var(--danger-500);
+}
+
+/* ============================================
+   DARK MODE: Semantic token overrides
+   Base palette remains unchanged
+   ============================================ */
+[data-theme="dark"] {
+  --surface:        var(--neutral-900);
+  --surface-alt:    var(--neutral-800);
+  --surface-elev:   var(--neutral-700);
+
+  --text-main:      var(--neutral-50);
+  --text-muted:     var(--neutral-300);
+  --text-soft:      var(--neutral-400);
+
+  --border-subtle:  var(--neutral-700);
+  --border-strong:   var(--neutral-600);
+
+  --accent-bg:      rgba(var(--accent-400) / 0.15);
+  --accent-border:  rgba(var(--accent-400) / 0.3);
 }
 
 body {
@@ -128,8 +95,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f3f4f6;
-  color: var(--color-text);
+  background-color: rgb(var(--surface));
+  color: rgb(var(--text-main));
 }
 
 @keyframes fadeIn {
