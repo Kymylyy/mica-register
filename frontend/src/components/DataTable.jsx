@@ -15,8 +15,7 @@ const columnHelper = createColumnHelper();
 // Presentational component for service tags
 const ServiceTag = ({ serviceCode, fullDescription, shortName }) => (
   <span
-    className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full cursor-help border border-blue-100"
-    title={fullDescription}
+    className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full border border-blue-100"
   >
     {shortName}
   </span>
