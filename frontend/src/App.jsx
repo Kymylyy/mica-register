@@ -208,7 +208,7 @@ function App() {
       <div className="py-4">
         {/* Header Section */}
         <header className="mb-3 max-w-7xl mx-auto px-4 lg:px-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-3 animate-fade-in">
+          <div className="bg-white rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.04)] border border-gray-200 p-4 mb-3 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
               {/* Left: Title + Subtitle */}
               <div className="flex-1">
