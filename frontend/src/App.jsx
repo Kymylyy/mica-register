@@ -229,7 +229,7 @@ function App() {
               </div>
             
                       {/* Right: Feedback + Contact utility panel */}
-                      <div className="flex flex-col items-start md:items-end gap-2 mt-[2px] lg:mt-[3px]">
+                      <div className="flex flex-col items-start md:items-end gap-2 mt-[2px] lg:mt-1">
                         <p className="text-xs uppercase tracking-[0.16em] text-slate-500/60 mb-1">
                           Feedback / suggest improvement
                         </p>
