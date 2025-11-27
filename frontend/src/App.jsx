@@ -4,7 +4,7 @@ import { DataTable } from './components/DataTable';
 import { Filters } from './components/Filters';
 import { getCountryFlag } from './components/FlagIcon';
 import { formatDate, copyToClipboard } from './utils/modalUtils';
-import { getServiceDescription, getServiceShortName, getServiceDescriptionCapitalized, getServiceCodeOrder } from './utils/serviceDescriptions';
+import { getServiceDescription, getServiceShortName, getServiceDescriptionCapitalized, getServiceCodeOrder, getServiceMediumName } from './utils/serviceDescriptions';
 
 // Country code to full English name mapping
 const COUNTRY_NAMES = {
@@ -298,28 +298,58 @@ function App() {
 
         {/* Entity Details Modal */}
         {selectedEntity && (
-          <div 
-            ref={modalRef}
-            className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"
-            onClick={(e) => {
-              if (e.target === modalRef.current || e.target.closest('.modal-content') === null) {
-                handleCloseDetails();
-              }
-            }}
-          >
-            <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto modal-content shadow-2xl animate-slide-down">
-              <div className="p-8">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-200">
-                  <h2 className="text-3xl font-bold text-gray-900">
-                    {selectedEntity.commercial_name || selectedEntity.lei_name}
-                  </h2>
+          <>
+            {/* Overlay backdrop */}
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 animate-fade-in" />
+            
+            {/* Modal panel wrapper */}
+            <div 
+              ref={modalRef}
+              className="fixed inset-0 z-50 flex items-center justify-center"
+              onClick={(e) => {
+                if (e.target === modalRef.current || e.target.closest('.modal-content') === null) {
+                  handleCloseDetails();
+                }
+              }}
+            >
+              <div className="bg-white shadow-xl rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-y-auto modal-content animate-slide-down mx-4">
+                <div className="p-6 md:p-8">
+                {/* Header with overview */}
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex-1">
+                    <h2 className="text-xl font-semibold text-textMain mb-2">
+                      {selectedEntity.commercial_name || selectedEntity.lei_name}
+                    </h2>
+                    {/* Overview line */}
+                    <div className="text-sm text-textMuted flex flex-wrap items-center gap-2">
+                      {selectedEntity.home_member_state && getCountryFlag(selectedEntity.home_member_state) && (
+                        <span>{getCountryFlag(selectedEntity.home_member_state)}</span>
+                      )}
+                      {selectedEntity.home_member_state && (
+                        <span>{COUNTRY_NAMES[selectedEntity.home_member_state] || selectedEntity.home_member_state}</span>
+                      )}
+                      {selectedEntity.competent_authority && (
+                        <>
+                          <span>•</span>
+                          <span>{selectedEntity.competent_authority}</span>
+                        </>
+                      )}
+                      {selectedEntity.authorisation_notification_date && (
+                        <>
+                          <span>•</span>
+                          <span>Authorised: {formatDate(selectedEntity.authorisation_notification_date)}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                   <button
                     onClick={handleCloseDetails}
-                    className="text-gray-400 hover:text-gray-600 text-3xl leading-none transition-colors rounded-full hover:bg-gray-100 w-10 h-10 flex items-center justify-center"
+                    className="text-textSoft hover:text-textMain transition-colors p-1.5 rounded-full hover:bg-surfaceAlt ml-4"
                     title="Close (ESC)"
                   >
-                    ×
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 </div>
 
@@ -330,201 +360,147 @@ function App() {
       </div>
                 )}
 
-                <div className="space-y-6">
-                  {/* All data in single line format */}
-                  <div className="space-y-5">
-                    {/* LEI */}
-                    <div className="flex items-center gap-4">
-                      <label className="text-base font-semibold text-gray-600 w-40 flex-shrink-0 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                        </svg>
-                        LEI
-                      </label>
-                      <div className="flex items-center gap-2 flex-1">
-                        <p className="text-base text-gray-900 font-medium">{selectedEntity.lei || '-'}</p>
-                        {selectedEntity.lei && (
-                          <button
-                            onClick={() => handleCopy(selectedEntity.lei, 'LEI')}
-                            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-gray-100"
-                            title="Copy LEI"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-        </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Home Member State */}
-                    <div className="flex items-center gap-4">
-                      <label className="text-base font-semibold text-gray-600 w-40 flex-shrink-0 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Home Member State
-                      </label>
-                      <div className="flex items-center gap-2">
-                        {selectedEntity.home_member_state && getCountryFlag(selectedEntity.home_member_state) && (
-                          <span>{getCountryFlag(selectedEntity.home_member_state)}</span>
-                        )}
-                        <p className="text-base text-gray-900 font-medium">
-                          {selectedEntity.home_member_state 
-                            ? (COUNTRY_NAMES[selectedEntity.home_member_state] || selectedEntity.home_member_state)
-                            : '-'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Competent Authority */}
-                    <div className="flex items-center gap-4">
-                      <label className="text-base font-semibold text-gray-600 w-40 flex-shrink-0 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                        Competent Authority
-                      </label>
-                      <p className="text-base text-gray-900 font-medium">{selectedEntity.competent_authority || '-'}</p>
-                    </div>
-
-                    {/* Address */}
-                    <div className="flex items-center gap-4">
-                      <label className="text-base font-semibold text-gray-600 w-40 flex-shrink-0 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Address
-                      </label>
-                      <div className="flex items-center gap-2 flex-1">
-                        <p className="text-base text-gray-900 font-medium">{selectedEntity.address || '-'}</p>
-                        {selectedEntity.address && (
-                          <button
-                            onClick={() => handleCopy(selectedEntity.address, 'Address')}
-                            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-gray-100"
-                            title="Copy address"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Website */}
-                    <div className="flex items-center gap-4">
-                      <label className="text-base font-semibold text-gray-600 w-40 flex-shrink-0 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                        </svg>
-                        Website
-                      </label>
-                      <div className="flex items-center gap-2 flex-1">
-                        {selectedEntity.website ? (
-                          <>
-                            <a
-                              href={selectedEntity.website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary hover:underline font-medium text-base"
-                            >
-                              {selectedEntity.website}
-                            </a>
+                {/* Two-column main section */}
+                <div className="mt-4 grid gap-8 md:grid-cols-2">
+                  {/* Left column: Entity details */}
+                  <div>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-textSoft mb-3">
+                      Entity details
+                    </h3>
+                    <dl className="space-y-3">
+                      {/* LEI */}
+                      <div>
+                        <dt className="text-xs font-medium text-textSoft mb-0.5">LEI</dt>
+                        <dd className="flex items-center gap-2 text-sm text-textMain">
+                          <span>{selectedEntity.lei || '-'}</span>
+                          {selectedEntity.lei && (
                             <button
-                              onClick={() => handleCopy(selectedEntity.website, 'Website')}
-                              className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-gray-100"
-                              title="Copy website"
+                              onClick={() => handleCopy(selectedEntity.lei, 'LEI')}
+                              className="text-textSoft hover:text-textMain transition-colors p-1 rounded hover:bg-surfaceAlt"
+                              title="Copy LEI"
                             >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                               </svg>
                             </button>
-                          </>
-                        ) : (
-                          <p className="text-base text-gray-900 font-medium">-</p>
-                        )}
+                          )}
+                        </dd>
                       </div>
-      </div>
 
-                    {/* Authorisation / Notification Date */}
-                    <div className="flex items-center gap-4">
-                      <label className="text-base font-semibold text-gray-600 w-40 flex-shrink-0 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Authorisation / Notification Date
-                      </label>
-                      <p className="text-base text-gray-900 font-medium">
-                        {formatDate(selectedEntity.authorisation_notification_date)}
-                      </p>
-                    </div>
-
-                    {/* Services */}
-                    <div className="flex items-start gap-4">
-                      <label className="text-base font-semibold text-gray-600 w-40 flex-shrink-0 flex items-center gap-2 pt-1">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        Services
-                      </label>
-                      <div className="flex-1">
-                        {selectedEntity.services && selectedEntity.services.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {[...selectedEntity.services]
-                              .sort((a, b) => getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code))
-                              .map((service, idx) => {
-                                const fullDescriptionCapitalized = getServiceDescriptionCapitalized(service.code);
-                                return (
-                                  <span
-                                    key={idx}
-                                    className="px-4 py-2 text-sm font-medium bg-blue-100 text-blue-800 rounded-lg border border-blue-200"
-                                  >
-                                    {fullDescriptionCapitalized}
-                                  </span>
-                                );
-                              })}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500 text-base font-medium">-</p>
-                        )}
+                      {/* Address */}
+                      <div>
+                        <dt className="text-xs font-medium text-textSoft mb-0.5">Address</dt>
+                        <dd className="text-sm text-textMain leading-snug">
+                          {selectedEntity.address ? (
+                            <>
+                              {selectedEntity.address}
+                              <button
+                                onClick={() => handleCopy(selectedEntity.address, 'Address')}
+                                className="ml-2 text-textSoft hover:text-textMain transition-colors p-1 rounded hover:bg-surfaceAlt inline-flex items-center"
+                                title="Copy address"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              </button>
+                            </>
+                          ) : (
+                            '-'
+                          )}
+                        </dd>
                       </div>
-                    </div>
 
-                    {/* Passport Countries */}
-                    {selectedEntity.passport_countries && selectedEntity.passport_countries.length > 0 && (
-                      <div className="flex items-start gap-4">
-                        <label className="text-base font-semibold text-gray-600 w-40 flex-shrink-0 flex items-center gap-2 pt-1">
-                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Passport Countries
-                        </label>
-                        <div className="flex flex-wrap gap-2 flex-1">
-                          {selectedEntity.passport_countries.map((country, idx) => (
-                            <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-sm font-medium border border-gray-200">
-                              {getCountryFlag(country.country_code) && (
-                                <span>{getCountryFlag(country.country_code)}</span>
-                              )}
-                              <span className="text-gray-900">{country.country_code}</span>
-                            </div>
-                          ))}
-                        </div>
+                      {/* Website */}
+                      <div>
+                        <dt className="text-xs font-medium text-textSoft mb-0.5">Website</dt>
+                        <dd className="flex items-center gap-2 text-sm text-textMain">
+                          {selectedEntity.website ? (
+                            <>
+                              <a
+                                href={selectedEntity.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-accent hover:underline font-medium"
+                              >
+                                {selectedEntity.website}
+                              </a>
+                              <button
+                                onClick={() => handleCopy(selectedEntity.website, 'Website')}
+                                className="text-textSoft hover:text-textMain transition-colors p-1 rounded hover:bg-surfaceAlt"
+                                title="Copy website"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              </button>
+                            </>
+                          ) : (
+                            '-'
+                          )}
+                        </dd>
                       </div>
+                    </dl>
+                  </div>
+
+                  {/* Right column: Services */}
+                  <div>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-textSoft mb-3">
+                      Services
+                    </h3>
+                    {selectedEntity.services && selectedEntity.services.length > 0 ? (
+                      <div className="space-y-2 text-sm text-textMain">
+                        {[...selectedEntity.services]
+                          .sort((a, b) => getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code))
+                          .map((service, idx) => {
+                            const mediumName = getServiceMediumName(service.code);
+                            return (
+                              <div key={idx} className="pb-2 border-b border-borderSubtle last:border-0 last:pb-0">
+                                {mediumName}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    ) : (
+                      <p className="text-textMuted text-sm font-medium">-</p>
                     )}
                   </div>
                 </div>
 
+                {/* Passport Countries - separate block at bottom */}
+                {selectedEntity.passport_countries && selectedEntity.passport_countries.length > 0 && (
+                  <div className="mt-6">
+                    <div className="h-px bg-borderSubtle mb-4" />
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="h-4 w-4 text-textSoft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-textSoft">
+                        Passport countries
+                      </span>
+                    </div>
+                    <div className="grid gap-2 grid-cols-4 sm:grid-cols-6 lg:grid-cols-8">
+                      {selectedEntity.passport_countries.map((country, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1 rounded-md bg-surfaceAlt border border-borderSubtle px-2 py-[2px] text-xs text-textMuted">
+                          {getCountryFlag(country.country_code) && (
+                            <span>{getCountryFlag(country.country_code)}</span>
+                          )}
+                          <span>{country.country_code}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Keyboard navigation hint */}
-                <div className="mt-8 pt-6 border-t border-gray-200 text-sm text-gray-500 text-center">
-                  Press <kbd className="px-2 py-1 bg-gray-100 rounded border border-gray-300 font-mono text-xs">ESC</kbd> to close, 
-                  <kbd className="px-2 py-1 bg-gray-100 rounded border border-gray-300 font-mono text-xs mx-1">←</kbd>
-                  <kbd className="px-2 py-1 bg-gray-100 rounded border border-gray-300 font-mono text-xs">→</kbd> to navigate
+                <div className="mt-6 text-center text-[13px] text-textSoft">
+                  Press <kbd className="inline-flex items-center rounded border border-borderSubtle px-1.5 py-[1px] text-[11px] text-textSoft font-mono">ESC</kbd> to close, 
+                  <kbd className="inline-flex items-center rounded border border-borderSubtle px-1.5 py-[1px] text-[11px] text-textSoft font-mono mx-1">←</kbd>
+                  <kbd className="inline-flex items-center rounded border border-borderSubtle px-1.5 py-[1px] text-[11px] text-textSoft font-mono">→</kbd> to navigate
+                </div>
                 </div>
               </div>
             </div>
-          </div>
+          </>
         )}
         </div>
       </div>
