@@ -54,10 +54,50 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
   const authDateDetailsRef = useRef(null);
   const authDateFromDateInputRef = useRef(null);
   const authDateToDateInputRef = useRef(null);
+  const authDateFromTextInputRef = useRef(null);
+  const authDateToTextInputRef = useRef(null);
   const [homeMemberStateSearch, setHomeMemberStateSearch] = useState('');
   const [cryptoServicesSearch, setCryptoServicesSearch] = useState('');
   const [authDateFromInput, setAuthDateFromInput] = useState('');
   const [authDateToInput, setAuthDateToInput] = useState('');
+
+  // Auto-format date input: add dashes after 2 and 5 digits
+  const handleDateInputChange = (value, setter, inputRef) => {
+    // Remove all non-digits
+    const digitsOnly = value.replace(/\D/g, '');
+    
+    // Limit to 8 digits (DDMMYYYY)
+    const limited = digitsOnly.slice(0, 8);
+    
+    // Format: DD-MM-YYYY
+    let formatted = '';
+    let cursorPos = limited.length;
+    
+    if (limited.length > 0) {
+      formatted = limited.slice(0, 2);
+      if (limited.length > 2) {
+        formatted += '-' + limited.slice(2, 4);
+        cursorPos = formatted.length; // Position after first dash
+        if (limited.length > 4) {
+          formatted += '-' + limited.slice(4, 8);
+          cursorPos = formatted.length; // Position after second dash
+        }
+      }
+    }
+    
+    setter(formatted);
+    
+    // Auto-advance cursor after adding dash
+    if (inputRef && inputRef.current) {
+      // If we just added a dash (at position 2 or 5), move cursor forward
+      if (limited.length === 2 || limited.length === 4) {
+        cursorPos = formatted.length; // Position after the dash
+      }
+      setTimeout(() => {
+        inputRef.current.setSelectionRange(cursorPos, cursorPos);
+      }, 0);
+    }
+  };
 
   // Convert YYYY-MM-DD to DD-MM-YYYY for display
   const formatDateForDisplay = (dateStr) => {
@@ -257,8 +297,11 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
   const handleRemoveDateFilter = () => {
     setAuthDateFromInput('');
     setAuthDateToInput('');
-    handleChange('auth_date_from', null);
-    handleChange('auth_date_to', null);
+    // Remove both date filters at once
+    const newFilters = { ...filters };
+    delete newFilters.auth_date_from;
+    delete newFilters.auth_date_to;
+    onFiltersChange(newFilters);
   };
 
   const handleRemoveSearch = () => {
@@ -359,11 +402,11 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
               
               {/* Search filter chip */}
               {filters.search && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium border border-blue-200">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium border border-blue-200">
                   <span>"{filters.search}"</span>
                   <button
                     onClick={handleRemoveSearch}
-                    className="ml-1 text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                    className="ml-1 text-blue-600 hover:text-blue-700 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
                     aria-label="Remove search filter"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -378,12 +421,12 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                 filters.home_member_states.map(countryCode => {
                   const countryName = COUNTRY_NAMES[countryCode] || countryCode;
                   return (
-                    <div key={countryCode} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium border border-blue-200">
+                    <div key={countryCode} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium border border-blue-200">
                       {getCountryFlag(countryCode) && <span>{getCountryFlag(countryCode)}</span>}
                       <span>{countryName}</span>
                       <button
                         onClick={() => handleRemoveHomeMemberState(countryCode)}
-                        className="ml-1 text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                        className="ml-1 text-blue-600 hover:text-blue-700 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
                         aria-label={`Remove ${countryName} filter`}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -401,11 +444,11 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                   const shortName = getServiceShortName(code);
                   const fullDescription = getServiceDescription(code);
                   return (
-                    <div key={code} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium border border-blue-200" title={fullDescription}>
+                    <div key={code} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium border border-blue-200" title={fullDescription}>
                       <span className="max-w-xs truncate">{shortName}</span>
                       <button
                         onClick={() => handleRemoveServiceCode(code)}
-                        className="ml-1 text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors flex-shrink-0"
+                        className="ml-1 text-blue-600 hover:text-blue-700 hover:bg-blue-200 rounded-full p-0.5 transition-colors flex-shrink-0"
                         aria-label={`Remove ${shortName} filter`}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -419,7 +462,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
 
               {/* Date filter chip */}
               {(filters.auth_date_from || filters.auth_date_to) && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium border border-blue-200">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium border border-blue-200">
                   <span>
                     {filters.auth_date_from && filters.auth_date_to
                       ? `${formatDateForDisplay(filters.auth_date_from)} - ${formatDateForDisplay(filters.auth_date_to)}`
@@ -452,6 +495,23 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
               className="relative"
               onToggle={(e) => {
                 if (e.target.open) {
+                  // Close other filters when opening this one
+                  if (homeMemberStateDetailsRef.current?.open) {
+                    homeMemberStateDetailsRef.current.open = false;
+                  }
+                  if (cryptoServicesDetailsRef.current?.open) {
+                    cryptoServicesDetailsRef.current.open = false;
+                  }
+                  // Close "Show/Hide Columns" if open
+                  const allDetails = document.querySelectorAll('details');
+                  allDetails.forEach(detail => {
+                    if (detail !== e.target && detail.open) {
+                      const summary = detail.querySelector('summary');
+                      if (summary && summary.textContent?.includes('Show/Hide Columns')) {
+                        detail.open = false;
+                      }
+                    }
+                  });
                   setTimeout(() => {
                     const firstDateInput = e.target.querySelector('input[type="text"][name="auth_date_from"]');
                     if (firstDateInput) firstDateInput.focus();
@@ -498,8 +558,11 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                       <input
                         type="text"
                         name="auth_date_from"
+                        ref={authDateFromTextInputRef}
                         value={authDateFromInput}
-                        onChange={(e) => setAuthDateFromInput(e.target.value)}
+                        onChange={(e) => {
+                          handleDateInputChange(e.target.value, setAuthDateFromInput, authDateFromTextInputRef);
+                        }}
                         onBlur={() => {
                           const value = authDateFromInput.trim();
                           if (!value) {
@@ -579,8 +642,11 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                       <input
                         type="text"
                         name="auth_date_to"
+                        ref={authDateToTextInputRef}
                         value={authDateToInput}
-                        onChange={(e) => setAuthDateToInput(e.target.value)}
+                        onChange={(e) => {
+                          handleDateInputChange(e.target.value, setAuthDateToInput, authDateToTextInputRef);
+                        }}
                         onBlur={() => {
                           const value = authDateToInput.trim();
                           if (!value) {
@@ -686,10 +752,29 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
               ref={homeMemberStateDetailsRef}
               className="relative"
               onToggle={(e) => {
-                if (e.target.open && homeMemberStateSearchRef.current) {
-                  setTimeout(() => {
-                    homeMemberStateSearchRef.current?.focus();
-                  }, 10);
+                if (e.target.open) {
+                  // Close other filters when opening this one
+                  if (authDateDetailsRef.current?.open) {
+                    authDateDetailsRef.current.open = false;
+                  }
+                  if (cryptoServicesDetailsRef.current?.open) {
+                    cryptoServicesDetailsRef.current.open = false;
+                  }
+                  // Close "Show/Hide Columns" if open
+                  const allDetails = document.querySelectorAll('details');
+                  allDetails.forEach(detail => {
+                    if (detail !== e.target && detail.open) {
+                      const summary = detail.querySelector('summary');
+                      if (summary && summary.textContent?.includes('Show/Hide Columns')) {
+                        detail.open = false;
+                      }
+                    }
+                  });
+                  if (homeMemberStateSearchRef.current) {
+                    setTimeout(() => {
+                      homeMemberStateSearchRef.current?.focus();
+                    }, 10);
+                  }
                 }
               }}
               onKeyDown={(e) => {
@@ -750,9 +835,27 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                     <div className="text-sm text-gray-500">No countries available</div>
                   ) : (() => {
                     const searchTerm = homeMemberStateSearch.toLowerCase();
+                    
+                    // Check if there are active filters (excluding home_member_states itself)
+                    const hasActiveFilters = !!(
+                      filters.search || 
+                      filters.service_codes?.length > 0 || 
+                      filters.auth_date_from || 
+                      filters.auth_date_to
+                    );
+                    
                     const filteredCountries = filterOptions.home_member_states
                       .map(country => {
                         const countryName = COUNTRY_NAMES[country.country_code] || country.country_code;
+                        const count = filterCounts.country_counts[country.country_code] !== undefined 
+                          ? filterCounts.country_counts[country.country_code] 
+                          : 0;
+                        
+                        // Hide countries with 0 results if there are active filters
+                        if (hasActiveFilters && count === 0) {
+                          return null;
+                        }
+                        
                         const filteredAuthorities = country.authorities.filter(authority => {
                           const authName = typeof authority === 'string' ? authority : authority.name;
                           const authAbbr = typeof authority === 'object' && authority.abbreviation 
@@ -838,10 +941,29 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
               ref={cryptoServicesDetailsRef}
               className="relative"
               onToggle={(e) => {
-                if (e.target.open && cryptoServicesSearchRef.current) {
-                  setTimeout(() => {
-                    cryptoServicesSearchRef.current?.focus();
-                  }, 10);
+                if (e.target.open) {
+                  // Close other filters when opening this one
+                  if (authDateDetailsRef.current?.open) {
+                    authDateDetailsRef.current.open = false;
+                  }
+                  if (homeMemberStateDetailsRef.current?.open) {
+                    homeMemberStateDetailsRef.current.open = false;
+                  }
+                  // Close "Show/Hide Columns" if open
+                  const allDetails = document.querySelectorAll('details');
+                  allDetails.forEach(detail => {
+                    if (detail !== e.target && detail.open) {
+                      const summary = detail.querySelector('summary');
+                      if (summary && summary.textContent?.includes('Show/Hide Columns')) {
+                        detail.open = false;
+                      }
+                    }
+                  });
+                  if (cryptoServicesSearchRef.current) {
+                    setTimeout(() => {
+                      cryptoServicesSearchRef.current?.focus();
+                    }, 10);
+                  }
                 }
               }}
               onKeyDown={(e) => {
@@ -902,11 +1024,30 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                     <div className="text-sm text-gray-500">No service codes available</div>
                   ) : (() => {
                     const searchTerm = cryptoServicesSearch.toLowerCase();
-                    const filteredServices = !searchTerm
+                    
+                    // Check if there are active filters (excluding service_codes itself)
+                    const hasActiveFilters = !!(
+                      filters.search || 
+                      filters.home_member_states?.length > 0 || 
+                      filters.auth_date_from || 
+                      filters.auth_date_to
+                    );
+                    
+                    let filteredServices = !searchTerm
                       ? filterOptions.service_codes
                       : filterOptions.service_codes.filter(service =>
                           service.description.toLowerCase().includes(searchTerm)
                         );
+                    
+                    // Hide services with 0 results if there are active filters
+                    if (hasActiveFilters) {
+                      filteredServices = filteredServices.filter(service => {
+                        const count = filterCounts.service_counts[service.code] !== undefined 
+                          ? filterCounts.service_counts[service.code] 
+                          : 0;
+                        return count > 0;
+                      });
+                    }
                     
                     if (filteredServices.length === 0) {
                       return <div className="text-sm text-gray-500">No results found</div>;
