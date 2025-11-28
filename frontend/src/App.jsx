@@ -50,10 +50,19 @@ function App() {
   const [copyFeedback, setCopyFeedback] = useState(null);
   const [filtersVisible, setFiltersVisible] = useState(true);
   const modalRef = useRef(null);
-  const searchDebounceRef = useRef(null);
   const isInitialMount = useRef(true);
+  const abortControllerRef = useRef(null);
 
   const fetchEntities = useCallback(async (showLoading = true) => {
+    // Cancel any previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     if (showLoading) {
       setLoading(true);
     }
@@ -74,18 +83,48 @@ function App() {
       if (filters.auth_date_to) params.append('auth_date_to', filters.auth_date_to);
 
       const [entitiesRes, countRes] = await Promise.all([
-        axios.get(`/api/entities?${params.toString()}&limit=1000`),
-        axios.get(`/api/entities/count?${params.toString()}`),
+        axios.get(`/api/entities?${params.toString()}&limit=1000`, {
+          signal: abortController.signal
+        }),
+        axios.get(`/api/entities/count?${params.toString()}`, {
+          signal: abortController.signal
+        }),
       ]);
 
-      setEntities(entitiesRes.data);
-      setCount(countRes.data.count);
+      // Only update state if this request wasn't cancelled
+      if (!abortController.signal.aborted) {
+        setEntities(entitiesRes.data);
+        setCount(countRes.data.count);
+      }
     } catch (error) {
+      // Ignore errors from cancelled requests
+      if (
+        error.name === 'CanceledError' || 
+        error.name === 'AbortError' || 
+        error.code === 'ERR_CANCELED' ||
+        error.message === 'canceled' ||
+        axios.isCancel(error) ||
+        abortController.signal.aborted
+      ) {
+        return;
+      }
       console.error('Error fetching entities:', error);
     } finally {
-      setLoading(false);
+      // Only update loading state if this request wasn't cancelled
+      if (!abortController.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [filters]);
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Initial fetch on mount
   useEffect(() => {
@@ -96,41 +135,16 @@ function App() {
     }
   }, []);
 
-  // Debounced effect for search - only triggers after user stops typing for 400ms
+  // Effect for all filters - triggers immediately but cancels previous requests
   useEffect(() => {
     // Skip on initial mount
     if (isInitialMount.current) return;
 
-    // Clear previous timeout
-    if (searchDebounceRef.current) {
-      clearTimeout(searchDebounceRef.current);
-    }
-
-    // Debounce search changes
-    searchDebounceRef.current = setTimeout(() => {
-      fetchEntities(true); // Show loading for search
-    }, 100); // 100ms delay
-
-    // Cleanup function
-    return () => {
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-      }
-    };
-  }, [filters.search, fetchEntities]);
-
-  // Immediate effect for other filters (non-search)
-  useEffect(() => {
-    // Skip on initial mount
-    if (isInitialMount.current) return;
-
-    // For other filter changes, fetch immediately (but cancel any pending search debounce)
-    // Don't show loading state to avoid flickering - keep previous data visible
-    if (searchDebounceRef.current) {
-      clearTimeout(searchDebounceRef.current);
-    }
-    fetchEntities(false); // Don't show loading state
-  }, [filters.home_member_states, filters.service_codes, filters.auth_date_from, filters.auth_date_to, fetchEntities]);
+    // Fetch immediately - AbortController will cancel any previous request
+    // Show loading only for search changes to provide feedback during typing
+    const showLoading = filters.search !== undefined;
+    fetchEntities(showLoading);
+  }, [filters.search, filters.home_member_states, filters.service_codes, filters.auth_date_from, filters.auth_date_to, fetchEntities]);
 
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
@@ -321,7 +335,7 @@ function App() {
                       {selectedEntity.commercial_name || selectedEntity.lei_name}
                     </h2>
                     {/* Overview line */}
-                    <div className="text-sm text-textMuted flex flex-wrap items-center gap-2">
+                    <div className="text-[clamp(0.7rem,1.5vw,0.875rem)] text-textMuted flex items-center gap-2 whitespace-nowrap overflow-hidden">
                       {selectedEntity.home_member_state && getCountryFlag(selectedEntity.home_member_state) && (
                         <span>{getCountryFlag(selectedEntity.home_member_state)}</span>
                       )}
@@ -364,9 +378,14 @@ function App() {
                 <div className="mt-4 grid gap-8 md:grid-cols-2">
                   {/* Left column: Entity details */}
                   <div>
-                    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-textSoft mb-3">
-                      Entity details
-                    </h3>
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="h-4 w-4 text-textSoft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-textSoft">
+                        Entity details
+                      </h3>
+                    </div>
                     <dl className="space-y-3">
                       {/* LEI */}
                       <div>
@@ -390,7 +409,7 @@ function App() {
                       {/* Address */}
                       <div>
                         <dt className="text-xs font-medium text-textSoft mb-0.5">Address</dt>
-                        <dd className="text-sm text-textMain leading-snug">
+                        <dd className="text-sm text-textMain leading-snug text-justify">
                           {selectedEntity.address ? (
                             <>
                               {selectedEntity.address}
@@ -444,9 +463,14 @@ function App() {
 
                   {/* Right column: Services */}
                   <div>
-                    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-textSoft mb-3">
-                      Services
-                    </h3>
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="h-4 w-4 text-textSoft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                      </svg>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-textSoft">
+                        Services
+                      </h3>
+                    </div>
                     {selectedEntity.services && selectedEntity.services.length > 0 ? (
                       <div className="space-y-2 text-sm text-textMain">
                         {[...selectedEntity.services]
@@ -487,6 +511,42 @@ function App() {
                           <span>{country.country_code}</span>
                         </span>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Comments - separate block */}
+                {selectedEntity.comments && (
+                  <div className="mt-6">
+                    <div className="h-px bg-borderSubtle mb-4" />
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="h-4 w-4 text-textSoft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-textSoft">
+                        Comments
+                      </span>
+                    </div>
+                    <div className="text-sm text-textMain leading-relaxed whitespace-pre-wrap text-justify">
+                      {selectedEntity.comments}
+                    </div>
+                  </div>
+                )}
+
+                {/* Last Update - separate block */}
+                {selectedEntity.last_update && (
+                  <div className="mt-6">
+                    <div className="h-px bg-borderSubtle mb-4" />
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="h-4 w-4 text-textSoft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-textSoft">
+                        Last Update
+                      </span>
+                    </div>
+                    <div className="text-sm text-textMain">
+                      {formatDate(selectedEntity.last_update)}
                     </div>
                   </div>
                 )}

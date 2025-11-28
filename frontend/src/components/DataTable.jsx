@@ -128,7 +128,7 @@ export function DataTable({ data, onRowClick, count }) {
           });
           
           return (
-            <div className="flex flex-wrap gap-[6px]">
+            <div className="flex flex-wrap gap-2">
               {sortedServices.map((service, idx) => {
                 const fullDescription = getServiceDescription(service.code);
                 const shortName = getServiceShortName(service.code);
@@ -262,7 +262,27 @@ export function DataTable({ data, onRowClick, count }) {
               Default
             </button>
           )}
-          <details ref={detailsRef} className="relative">
+          <details 
+            ref={detailsRef} 
+            className="relative"
+            onToggle={(e) => {
+              if (e.target.open) {
+                // Close all filter details when opening columns
+                // Find all details elements that are filters (not this one)
+                const allDetails = document.querySelectorAll('details');
+                allDetails.forEach(detail => {
+                  // Close all details except this one (columns) and those that are already closed
+                  if (detail !== e.target && detail.open) {
+                    // Check if it's a filter detail (has specific structure)
+                    const summary = detail.querySelector('summary');
+                    if (summary && !summary.textContent?.includes('Show/Hide Columns')) {
+                      detail.open = false;
+                    }
+                  }
+                });
+              }
+            }}
+          >
           <summary className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-300 bg-white text-gray-700 text-xs font-medium cursor-pointer hover:border-sky-300 hover:bg-slate-50 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 list-none">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -300,8 +320,75 @@ export function DataTable({ data, onRowClick, count }) {
         </div>
       </div>
 
-      {/* Table with sticky header */}
-      <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm transition-all duration-300 ease-in-out">
+      {/* Card view for mobile/tablet */}
+      <div className="block md:hidden space-y-3">
+        {table.getRowModel().rows.map((row, rowIndex) => {
+          const entity = row.original;
+          const commercialName = entity.commercial_name?.trim() || entity.lei_name || '-';
+          const homeState = entity.home_member_state;
+          const authDate = entity.authorisation_notification_date;
+          const services = entity.services || [];
+          const sortedServices = [...services].sort((a, b) => 
+            getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code)
+          );
+          
+          return (
+            <div
+              key={row.id}
+              onClick={() => onRowClick && onRowClick(entity)}
+              className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-gray-300 animate-fade-in-row"
+              style={{
+                animationDelay: `${Math.min(rowIndex * 15, 200)}ms`,
+                animationFillMode: 'both'
+              }}
+            >
+              {/* Header */}
+              <div className="mb-3 pb-3 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-900 leading-relaxed mb-2">{commercialName}</h3>
+                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                  {homeState && (
+                    <div className="flex items-center gap-1.5">
+                      {getCountryFlag(homeState) && <span>{getCountryFlag(homeState)}</span>}
+                      <span>{homeState}</span>
+                    </div>
+                  )}
+                  {authDate && (
+                    <>
+                      {homeState && <span className="text-gray-300">•</span>}
+                      <span>{new Date(authDate).toLocaleDateString()}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {/* Services */}
+              {sortedServices.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Services
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {sortedServices.map((service, idx) => {
+                      const shortName = getServiceShortName(service.code);
+                      return (
+                        <ServiceTag
+                          key={idx}
+                          serviceCode={service.code}
+                          fullDescription={getServiceDescription(service.code)}
+                          shortName={shortName}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Table view for desktop */}
+      <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-lg shadow-sm transition-all duration-300 ease-in-out">
         <table className="min-w-full divide-y divide-gray-200 table-fixed">
           <thead className="bg-slate-50/80 backdrop-blur-sm sticky top-0 z-10 shadow-sm">
             {table.getHeaderGroups().map(headerGroup => (
@@ -309,9 +396,9 @@ export function DataTable({ data, onRowClick, count }) {
                 {headerGroup.headers.map((header, headerIndex) => (
                   <th
                     key={header.id}
-                    className={`px-3 py-2 text-left text-[11px] font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors ${
+                    className={`px-4 py-3 text-left text-[11px] font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors ${
                       headerIndex === 0 ? 'sticky left-0 z-20 bg-slate-50/80 backdrop-blur-sm' : ''
-                    }`}
+                    } ${headerIndex > 0 ? 'border-l border-gray-100' : ''}`}
                     style={{
                       width: header.column.id === 'commercial_name' ? '280px' :
                              header.column.id === 'home_member_state' ? '180px' :
@@ -348,7 +435,7 @@ export function DataTable({ data, onRowClick, count }) {
               </tr>
             ))}
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white divide-y divide-gray-100">
             {table.getRowModel().rows.map((row, rowIndex) => (
               <tr
                 key={row.id}
@@ -367,8 +454,8 @@ export function DataTable({ data, onRowClick, count }) {
                 {row.getVisibleCells().map((cell, cellIndex) => (
                   <td 
                     key={cell.id} 
-                    className={`px-3 py-2 text-sm text-gray-900 ${
-                      cellIndex === 0 ? 'sticky left-0 z-10 bg-inherit font-medium' : ''
+                    className={`px-4 py-4 text-sm text-gray-900 leading-relaxed ${
+                      cellIndex === 0 ? 'sticky left-0 z-10 bg-inherit font-medium' : 'border-l border-gray-100'
                     }`}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

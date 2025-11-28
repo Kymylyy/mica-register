@@ -9,7 +9,7 @@ from ..schemas import Entity as EntitySchema, EntityTag as EntityTagSchema, TagC
 
 router = APIRouter()
 
-# MiCA service descriptions for search matching
+# MiCA service descriptions for search matching (full descriptions)
 MICA_SERVICE_DESCRIPTIONS = {
     "a": "providing custody and administration of crypto-assets on behalf of clients",
     "b": "operation of a trading platform for crypto-assets",
@@ -23,29 +23,121 @@ MICA_SERVICE_DESCRIPTIONS = {
     "j": "providing transfer services for crypto-assets on behalf of clients"
 }
 
+# Short service names for search matching
+MICA_SERVICE_SHORT_NAMES = {
+    "a": "Custody",
+    "b": "Trading platform",
+    "c": "Crypto-to-funds",
+    "d": "Crypto-to-crypto",
+    "e": "Order execution",
+    "f": "Placement",
+    "g": "Order routing",
+    "h": "Advisory",
+    "i": "Portfolio management",
+    "j": "Transfer"
+}
+
+# Medium service names for search matching
+MICA_SERVICE_MEDIUM_NAMES = {
+    "a": "Custody and administration",
+    "b": "Trading platform operation",
+    "c": "Crypto-to-funds exchange",
+    "d": "Crypto-to-crypto exchange",
+    "e": "Order execution",
+    "f": "Placing of crypto-assets",
+    "g": "Reception and transmission of orders",
+    "h": "Crypto-asset advisory",
+    "i": "Portfolio management",
+    "j": "Transfer services"
+}
+
+# Country code to full English name mapping (for search)
+COUNTRY_NAMES = {
+    'AT': 'Austria',
+    'BE': 'Belgium',
+    'BG': 'Bulgaria',
+    'CY': 'Cyprus',
+    'CZ': 'Czech Republic',
+    'DE': 'Germany',
+    'DK': 'Denmark',
+    'EE': 'Estonia',
+    'ES': 'Spain',
+    'FI': 'Finland',
+    'FR': 'France',
+    'GR': 'Greece',
+    'HR': 'Croatia',
+    'HU': 'Hungary',
+    'IE': 'Ireland',
+    'IS': 'Iceland',
+    'IT': 'Italy',
+    'LI': 'Liechtenstein',
+    'LT': 'Lithuania',
+    'LU': 'Luxembourg',
+    'LV': 'Latvia',
+    'MT': 'Malta',
+    'NL': 'Netherlands',
+    'NO': 'Norway',
+    'PL': 'Poland',
+    'PT': 'Portugal',
+    'RO': 'Romania',
+    'SE': 'Sweden',
+    'SI': 'Slovenia',
+    'SK': 'Slovakia',
+    'EL': 'Greece',  # Alternative code for Greece
+}
+
 def apply_search_filter(query, search: str):
-    """Apply search filter including service descriptions"""
+    """Apply search filter: commercial name, country names, and service names (short/medium/full)"""
     if not search:
         return query
     
-    # Search in entity fields
-    search_filter = or_(
-        Entity.commercial_name.ilike(f"%{search}%"),
-        Entity.lei_name.ilike(f"%{search}%"),
-        Entity.address.ilike(f"%{search}%"),
-        Entity.website.ilike(f"%{search}%")
-    )
+    search_lower = search.lower().strip()
+    search_original = search.strip()
     
-    # Check if search term matches any service description
-    search_lower = search.lower()
+    # Build search conditions - only commercial_name
+    search_conditions = [
+        Entity.commercial_name.ilike(f"%{search_original}%"),
+    ]
+    
+    # Check if search term matches any country name (e.g., "Germany" -> "DE")
+    # Only map country names, NOT country codes
+    matching_country_codes = []
+    for code, name in COUNTRY_NAMES.items():
+        if search_lower in name.lower() or name.lower().startswith(search_lower):
+            matching_country_codes.append(code)
+    
+    # Add country code matches to search conditions
+    if matching_country_codes:
+        search_conditions.append(Entity.home_member_state.in_(matching_country_codes))
+    
+    # Check if search term matches any service description (full, medium, or short)
     matching_service_codes = []
+    
+    # Check full descriptions
     for code, description in MICA_SERVICE_DESCRIPTIONS.items():
         if search_lower in description.lower():
-            matching_service_codes.append(code)
+            if code not in matching_service_codes:
+                matching_service_codes.append(code)
+    
+    # Check medium names
+    for code, name in MICA_SERVICE_MEDIUM_NAMES.items():
+        if search_lower in name.lower():
+            if code not in matching_service_codes:
+                matching_service_codes.append(code)
+    
+    # Check short names
+    for code, name in MICA_SERVICE_SHORT_NAMES.items():
+        if search_lower in name.lower():
+            if code not in matching_service_codes:
+                matching_service_codes.append(code)
+    
+    # Combine all search conditions
+    search_filter = or_(*search_conditions)
     
     if matching_service_codes:
         # If search matches services, also filter by those services
-        query = query.outerjoin(Entity.services).filter(
+        # Use join (inner join) to ensure we only get entities with matching services
+        query = query.join(Entity.services).filter(
             or_(
                 search_filter,
                 Service.code.in_(matching_service_codes)
