@@ -82,19 +82,35 @@ cd backend
 pip install -r requirements.txt
 ```
 
-3. **Import CSV data:**
+3. **Database Configuration:**
+
+   **Option A: PostgreSQL (Recommended for production)**
+   ```bash
+   # Set DATABASE_URL environment variable
+   export DATABASE_URL="postgresql://user:password@localhost:5432/mica_register"
+   # Or create a .env file with:
+   # DATABASE_URL=postgresql://user:password@localhost:5432/mica_register
+   ```
+   
+   **Option B: SQLite (Default for local development)**
+   ```bash
+   # No configuration needed - SQLite will be used automatically
+   # if DATABASE_URL is not set
+   ```
+
+4. **Import CSV data:**
 ```bash
 # Make sure casp-register.csv is in the root directory
 python import_data.py
 ```
 
 This will:
-- Create the SQLite database
+- Create the database (PostgreSQL or SQLite based on DATABASE_URL)
 - Import all entities from `casp-register.csv`
 - Normalize service codes to MiCA standard (a-j)
 - Fix encoding issues (German characters, quotation marks)
 
-4. **Run the server:**
+5. **Run the server:**
 ```bash
 uvicorn app.main:app --reload
 ```
@@ -204,14 +220,68 @@ The CSV import process:
 
 ### Backend
 - FastAPI with SQLAlchemy ORM
-- SQLite database (can be easily switched to PostgreSQL)
+- PostgreSQL database (with SQLite fallback for local development)
 - Automatic API documentation at `http://localhost:8000/docs`
+- Database URL configured via `DATABASE_URL` environment variable
 
 ### Frontend
 - React 19 with Vite
 - TanStack Table for advanced table features
 - Tailwind CSS for styling
 - Axios for API calls
+
+## Deployment
+
+### Frontend (Vercel)
+
+1. **Connect your GitHub repository to Vercel**
+   - Go to [vercel.com](https://vercel.com) and sign in
+   - Click "New Project" and import your repository
+   - Set root directory to `frontend`
+
+2. **Configure Environment Variables**
+   - In Vercel project settings, add:
+     - `VITE_API_URL` = Your Railway backend URL (e.g., `https://your-app.railway.app`)
+
+3. **Deploy**
+   - Vercel will automatically build and deploy on every push to main branch
+
+### Backend (Railway)
+
+1. **Create Railway Account**
+   - Go to [railway.app](https://railway.app) and sign in with GitHub
+
+2. **Create New Project**
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your repository
+   - Railway will detect the Dockerfile in `backend/` directory
+
+3. **Add PostgreSQL Database**
+   - In Railway project, click "New" → "Database" → "PostgreSQL"
+   - Railway will automatically set `DATABASE_URL` environment variable
+
+4. **Configure Environment Variables**
+   - In Railway project settings, add:
+     - `CORS_ORIGINS` = Your Vercel frontend URL (e.g., `https://your-app.vercel.app`)
+     - `DATABASE_URL` = Automatically set by Railway PostgreSQL service
+
+5. **Deploy**
+   - Railway will automatically build from Dockerfile and deploy
+   - Get your backend URL from Railway (e.g., `https://your-app.railway.app`)
+
+6. **Update Frontend Environment Variable**
+   - Go back to Vercel and update `VITE_API_URL` with your Railway backend URL
+
+### First Data Import
+
+After deployment, you need to import the initial CSV data:
+
+1. **SSH into Railway container** (or use Railway CLI):
+   ```bash
+   railway run python import_data.py
+   ```
+
+2. **Or create an admin endpoint** for data import (recommended for production)
 
 ## License
 
@@ -224,7 +294,7 @@ The application is in MVP development phase. See `TODO.md` for current tasks and
 ### Known Issues / TODO
 - "Last updated" timestamp in header shows placeholder - needs API endpoint
 - Automatic data download from ESMA website not yet implemented
-- Production configuration (CORS, API URLs) needs environment variables
+- Production deployment ready - see Deployment section above
 
 ## Notes
 
@@ -232,3 +302,5 @@ The application is in MVP development phase. See `TODO.md` for current tasks and
 - CSV file should be placed in the root directory
 - Virtual environment and database files are gitignored
 - The application handles up to 1000 entities per request (adjustable in API)
+- **Database:** Uses PostgreSQL when `DATABASE_URL` environment variable is set, otherwise falls back to SQLite for local development
+- **Production:** Set `DATABASE_URL` environment variable to your PostgreSQL connection string (format: `postgresql://user:password@host:port/database`)

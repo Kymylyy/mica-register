@@ -4,15 +4,27 @@ from sqlalchemy.orm import sessionmaker
 import os
 from pathlib import Path
 
-# SQLite database file path (relative to backend directory)
-backend_dir = Path(__file__).parent.parent
-DATABASE_URL = f"sqlite:///{backend_dir / 'database.db'}"
+# Database configuration
+# Use PostgreSQL if DATABASE_URL is set, otherwise fallback to SQLite for local development
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_engine(
-    DATABASE_URL, 
-    connect_args={"check_same_thread": False},
-    echo=False
-)
+if DATABASE_URL:
+    # PostgreSQL connection
+    # DATABASE_URL format: postgresql://user:password@host:port/database
+    # For production, this will be set by the hosting platform
+    engine = create_engine(
+        DATABASE_URL,
+        echo=False
+    )
+else:
+    # SQLite fallback for local development
+    backend_dir = Path(__file__).parent.parent
+    sqlite_url = f"sqlite:///{backend_dir / 'database.db'}"
+    engine = create_engine(
+        sqlite_url,
+        connect_args={"check_same_thread": False},
+        echo=False
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

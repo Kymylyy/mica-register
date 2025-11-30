@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 export function TagManager({ entityId, tags, onTagsUpdate }) {
   const [newTagName, setNewTagName] = useState('');
@@ -10,7 +10,7 @@ export function TagManager({ entityId, tags, onTagsUpdate }) {
     if (!newTagName.trim()) return;
 
     try {
-      await axios.post(`/api/entities/${entityId}/tags`, {
+      await api.post(`/api/entities/${entityId}/tags`, {
         tag_name: newTagName.trim(),
         tag_value: newTagValue.trim() || null,
       });
@@ -26,7 +26,7 @@ export function TagManager({ entityId, tags, onTagsUpdate }) {
 
   const handleRemoveTag = async (tagName) => {
     try {
-      await axios.delete(`/api/entities/${entityId}/tags/${tagName}`);
+      await api.delete(`/api/entities/${entityId}/tags/${tagName}`);
       onTagsUpdate();
     } catch (error) {
       console.error('Error removing tag:', error);
