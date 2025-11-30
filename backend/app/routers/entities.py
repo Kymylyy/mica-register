@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import List, Optional
 from datetime import date
-from ..database import get_db
+from ..database import get_db, engine, Base
 from ..models import Entity, Service, PassportCountry, EntityTag
 from ..schemas import Entity as EntitySchema, EntityTag as EntityTagSchema, TagCreate, EntityUpdate
 
@@ -482,5 +482,54 @@ def update_entity(
     db.commit()
     db.refresh(entity)
     return entity
+
+
+@router.post("/admin/import")
+def import_data(db: Session = Depends(get_db)):
+    """Import CSV data into database (admin endpoint)"""
+    import os
+    from pathlib import Path
+    from ..import_csv import import_csv_to_db
+    
+    # Try multiple locations for CSV file
+    possible_paths = [
+        "/app/casp-register.csv",  # Docker container
+        os.path.join(Path(__file__).parent.parent.parent, "casp-register.csv"),  # Local dev
+        "casp-register.csv",  # Current directory
+    ]
+    
+    csv_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            csv_path = path
+            break
+    
+    if not csv_path:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"CSV file not found. Tried: {possible_paths}"
+        )
+    
+    try:
+        # Create tables if they don't exist
+        Base.metadata.create_all(bind=engine)
+        
+        # Import data
+        import_csv_to_db(db, csv_path)
+        
+        # Get count of imported entities
+        entity_count = db.query(Entity).count()
+        
+        return {
+            "message": "Data imported successfully",
+            "csv_path": csv_path,
+            "entities_count": entity_count
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error importing data: {str(e)}"
+        )
 
 
