@@ -19,11 +19,23 @@ if __name__ == "__main__":
     Base.metadata.create_all(bind=engine)
     print("Tables created successfully!")
     
-    # Path to CSV file (relative to backend directory)
-    csv_path = os.path.join(os.path.dirname(__file__), "..", "casp-register.csv")
+    # Path to CSV file - try multiple locations
+    # In Docker container: /app/casp-register.csv
+    # In local development: ../casp-register.csv (relative to backend/)
+    possible_paths = [
+        "/app/casp-register.csv",  # Docker container
+        os.path.join(os.path.dirname(__file__), "..", "casp-register.csv"),  # Local dev
+        "casp-register.csv",  # Current directory
+    ]
     
-    if not os.path.exists(csv_path):
-        print(f"Error: CSV file not found at {csv_path}")
+    csv_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            csv_path = path
+            break
+    
+    if not csv_path:
+        print(f"Error: CSV file not found. Tried: {possible_paths}")
         sys.exit(1)
     
     db = SessionLocal()
