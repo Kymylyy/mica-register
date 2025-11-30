@@ -230,7 +230,7 @@ function App() {
                   Crypto-asset service provider register
                 </h1>
                 <p className="text-sm text-slate-600">
-                  Last updated: [placeholder] • ESMA register{' '}
+                  ESMA register{' '}
                   <a
                     href="https://www.esma.europa.eu/esmas-activities/digital-finance-and-innovation/markets-crypto-assets-regulation-mica#InterimMiCARegister"
                     target="_blank"
@@ -239,6 +239,7 @@ function App() {
                   >
                     available here
                   </a>
+                  {' '}• Last updated: 25 November 2025
                 </p>
               </div>
             
