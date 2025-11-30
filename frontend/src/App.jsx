@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import axios from 'axios';
+import api from './utils/api';
 import { DataTable } from './components/DataTable';
 import { Filters } from './components/Filters';
 import { getCountryFlag } from './components/FlagIcon';
@@ -83,10 +83,10 @@ function App() {
       if (filters.auth_date_to) params.append('auth_date_to', filters.auth_date_to);
 
       const [entitiesRes, countRes] = await Promise.all([
-        axios.get(`/api/entities?${params.toString()}&limit=1000`, {
+        api.get(`/api/entities?${params.toString()}&limit=1000`, {
           signal: abortController.signal
         }),
-        axios.get(`/api/entities/count?${params.toString()}`, {
+        api.get(`/api/entities/count?${params.toString()}`, {
           signal: abortController.signal
         }),
       ]);
@@ -183,7 +183,7 @@ function App() {
 
         setSelectedEntity(entities[newIndex]);
         // Refresh entity details
-        axios.get(`/api/entities/${entities[newIndex].id}`)
+        api.get(`/api/entities/${entities[newIndex].id}`)
           .then(response => setSelectedEntity(response.data))
           .catch(error => console.error('Error fetching entity:', error));
       }

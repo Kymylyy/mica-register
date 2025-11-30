@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { getCountryFlag } from './FlagIcon';
 import { getServiceDescriptionCapitalized, getServiceCodeOrder, getServiceShortName, getServiceDescription } from '../utils/serviceDescriptions';
 
@@ -140,7 +140,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
 
   useEffect(() => {
     // Fetch filter options
-    axios.get('/api/filters/options')
+    api.get('/api/filters/options')
       .then(response => {
         // Sort service codes by MiCA order
         const sortedServiceCodes = response.data.service_codes.sort((a, b) => 
@@ -193,7 +193,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
     }
     
     // Fetch country counts (backend ignores home_member_states for country_counts)
-    axios.get(`/api/filters/counts?${params.toString()}`)
+    api.get(`/api/filters/counts?${params.toString()}`)
       .then(response => {
         setFilterCounts(prev => ({
           ...prev,
@@ -221,7 +221,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
     }
     
     // Fetch service counts (backend ignores service_codes for service_counts)
-    axios.get(`/api/filters/counts?${params.toString()}`)
+    api.get(`/api/filters/counts?${params.toString()}`)
       .then(response => {
         setFilterCounts(prev => ({
           ...prev,
@@ -983,7 +983,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                 }
               `}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                 </svg>
                 <span>Crypto-asset services</span>
                 {(filters.service_codes || []).length > 0 && (
