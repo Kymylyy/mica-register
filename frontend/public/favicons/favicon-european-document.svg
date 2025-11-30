@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background square -->
+  <rect width="32" height="32" rx="4" fill="#1e40af"/>
+  
+  <!-- Document/card shape -->
+  <rect x="8" y="6" width="16" height="20" rx="2" fill="#2563eb" stroke="white" stroke-width="1"/>
+  
+  <!-- Document fold corner -->
+  <path d="M 20 6 L 24 6 L 24 10 L 20 6 Z" fill="#1e40af"/>
+  
+  <!-- Minimalist EU star in center -->
+  <path d="M 16 14 L 16.6 16.2 L 19 16.8 L 16.6 17.4 L 16 19.6 L 15.4 17.4 L 13 16.8 L 15.4 16.2 Z" fill="white"/>
+  
+  <!-- Alternative: Euro symbol (commented, can be used instead) -->
+  <!-- <text x="16" y="18" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">€</text> -->
+</svg>
+

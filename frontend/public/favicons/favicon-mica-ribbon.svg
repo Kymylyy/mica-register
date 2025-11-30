@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background square -->
+  <rect width="32" height="32" rx="4" fill="#1e40af"/>
+  
+  <!-- Stylized geometric letter M -->
+  <text x="16" y="22" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#2563eb" text-anchor="middle">M</text>
+  
+  <!-- Diagonal ribbon/line cutting through M -->
+  <line x1="6" y1="10" x2="26" y2="22" stroke="#1e40af" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Alternative: Ribbon surrounding M contour (commented) -->
+  <!-- <path d="M 10 8 Q 16 6 22 8 L 20 12 Q 16 10 12 12 Z" fill="#1e40af" opacity="0.8"/> -->
+</svg>
+
