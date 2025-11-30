@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import api from './utils/api';
 import { DataTable } from './components/DataTable';
 import { Filters } from './components/Filters';
@@ -565,6 +566,7 @@ function App() {
         )}
         </div>
       </div>
+      <Analytics />
     </div>
   );
 }
