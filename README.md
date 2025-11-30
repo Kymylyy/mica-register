@@ -169,10 +169,6 @@ To change the entire color scheme, edit the CSS variables in `frontend/src/index
 - `red` - Error/destructive actions
 - `green` - Success states
 
-### Example Palettes
-
-See `frontend/COLOR_PALETTES.md` for example color palettes you can copy and paste to test different schemes (Blue, Purple, Green, Orange, Teal, etc.).
-
 **Note:** The codebase currently uses a mix of direct Tailwind classes and CSS variables. Changing CSS variables will affect all elements using the variable-based classes. For full control, components can be gradually migrated to use the new system.
 
 ## API Endpoints
@@ -289,12 +285,11 @@ This project is for displaying publicly available ESMA data.
 
 ## Current Status
 
-The application is in MVP development phase. See `TODO.md` for current tasks and improvements.
+The application is in active development. Production deployment is ready - see Deployment section above.
 
-### Known Issues / TODO
+### Known Issues
 - "Last updated" timestamp in header shows placeholder - needs API endpoint
 - Automatic data download from ESMA website not yet implemented
-- Production deployment ready - see Deployment section above
 
 ## Notes
 
