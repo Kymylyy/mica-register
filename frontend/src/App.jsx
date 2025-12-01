@@ -3,7 +3,7 @@ import { Analytics } from '@vercel/analytics/react';
 import api from './utils/api';
 import { DataTable } from './components/DataTable';
 import { Filters } from './components/Filters';
-import { getCountryFlag } from './components/FlagIcon';
+import { FlagIcon } from './components/FlagIcon';
 import { formatDate, copyToClipboard } from './utils/modalUtils';
 import { getServiceDescription, getServiceShortName, getServiceDescriptionCapitalized, getServiceCodeOrder, getServiceMediumName } from './utils/serviceDescriptions';
 
@@ -338,8 +338,8 @@ function App() {
                     </h2>
                     {/* Overview line */}
                     <div className="text-[clamp(0.7rem,1.5vw,0.875rem)] text-textMuted flex items-center gap-2 whitespace-nowrap overflow-hidden">
-                      {selectedEntity.home_member_state && getCountryFlag(selectedEntity.home_member_state) && (
-                        <span>{getCountryFlag(selectedEntity.home_member_state)}</span>
+                      {selectedEntity.home_member_state && (
+                        <FlagIcon countryCode={selectedEntity.home_member_state} size="sm" />
                       )}
                       {selectedEntity.home_member_state && (
                         <span>{COUNTRY_NAMES[selectedEntity.home_member_state] || selectedEntity.home_member_state}</span>
@@ -507,9 +507,7 @@ function App() {
                     <div className="grid gap-2 grid-cols-4 sm:grid-cols-6 lg:grid-cols-8">
                       {selectedEntity.passport_countries.map((country, idx) => (
                         <span key={idx} className="inline-flex items-center gap-1 rounded-md bg-surfaceAlt border border-borderSubtle px-2 py-[2px] text-xs text-textMuted">
-                          {getCountryFlag(country.country_code) && (
-                            <span>{getCountryFlag(country.country_code)}</span>
-                          )}
+                          <FlagIcon countryCode={country.country_code} size="xs" />
                           <span>{country.country_code}</span>
                         </span>
                       ))}

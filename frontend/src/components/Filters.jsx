@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
-import { getCountryFlag } from './FlagIcon';
+import { FlagIcon } from './FlagIcon';
 import { getServiceDescriptionCapitalized, getServiceCodeOrder, getServiceShortName, getServiceDescription } from '../utils/serviceDescriptions';
 
 // Country code to full English name mapping
@@ -422,7 +422,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                   const countryName = COUNTRY_NAMES[countryCode] || countryCode;
                   return (
                     <div key={countryCode} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium border border-blue-200">
-                      {getCountryFlag(countryCode) && <span>{getCountryFlag(countryCode)}</span>}
+                      <FlagIcon countryCode={countryCode} size="sm" />
                       <span>{countryName}</span>
                       <button
                         onClick={() => handleRemoveHomeMemberState(countryCode)}
@@ -909,8 +909,9 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                                   onChange={() => handleHomeMemberStateToggle(country.country_code)}
                                   className="mt-1 rounded"
                                 />
-                                <span className="text-sm flex-1">
-                                  {getCountryFlag(country.country_code)} {countryName} - {displayName}
+                                <span className="text-sm flex-1 flex items-center gap-1.5">
+                                  <FlagIcon countryCode={country.country_code} size="sm" />
+                                  <span>{countryName} - {displayName}</span>
                                   <span className="ml-2 text-gray-500">
                                     ({count})
                                   </span>
