@@ -3,11 +3,112 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MiCA Register</title>
+    
+    <!-- Primary Meta Tags -->
+    <title>MiCA Register - Crypto-asset Service Provider Register</title>
+    <meta name="title" content="MiCA Register - Crypto-asset Service Provider Register" />
+    <meta name="description" content="MiCA Register: Search and filter licensed crypto-asset service providers in the EU. Find MiCA-compliant providers by country, crypto services, and authorization date. Markets in Crypto-Assets regulation." />
+    <meta name="keywords" content="MiCA, crypto-asset, Markets in Crypto-Assets, service providers, EU, MiCA regulation, licensed crypto providers, crypto-asset services, MiCA compliant, crypto custody, trading platform, crypto exchange" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="English" />
+    <meta name="author" content="Kamil Mosoń" />
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://micaregister.com" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="MiCA Register - Crypto-asset Service Provider Register" />
+    <meta property="og:description" content="MiCA Register: Search and filter licensed crypto-asset service providers in the EU. Find MiCA-compliant providers by country, crypto services, and authorization date." />
+    <meta property="og:site_name" content="MiCA Register" />
+    <meta property="og:image" content="https://micaregister.com/favicon.svg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://micaregister.com" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MiCA Register - Crypto-asset Service Provider Register" />
+    <meta name="twitter:description" content="MiCA Register: Search and filter licensed crypto-asset service providers in the EU. Markets in Crypto-Assets regulation." />
+    <meta name="twitter:image" content="https://micaregister.com/favicon.svg" />
+    
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "MiCA Register",
+      "description": "Search and filter licensed crypto-asset service providers in the EU. MiCA-compliant provider database.",
+      "url": "https://micaregister.com",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Kamil Mosoń"
+      },
+      "keywords": "MiCA, crypto-asset, Markets in Crypto-Assets, service providers, EU regulation, licensed crypto providers"
+    }
+    </script>
+    
+    <!-- Inline CSS for loading spinner -->
+    <style>
+      #root:empty::before {
+        content: '';
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #f8fafc;
+        z-index: 9999;
+      }
+      #root:empty::after {
+        content: 'Loading MiCA Register...';
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        font-size: 16px;
+        background: linear-gradient(90deg, #475569 0%, #64748b 50%, #475569 100%);
+        background-size: 200% 100%;
+        animation: loading 1.5s ease-in-out infinite;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        z-index: 10000;
+      }
+      @keyframes loading {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <noscript>
+      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;">
+        <div>
+          <h1 style="font-size: 24px; margin-bottom: 16px; color: #1e293b;">JavaScript Required</h1>
+          <p style="font-size: 16px; color: #64748b; max-width: 500px; margin: 0 auto;">
+            MiCA Register requires JavaScript to function. Please enable JavaScript in your browser settings to continue.
+          </p>
+        </div>
+      </div>
+    </noscript>
+    <div id="root">
+      <!-- Loading spinner will show here until React mounts -->
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
