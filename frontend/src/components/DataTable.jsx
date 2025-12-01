@@ -7,7 +7,7 @@ import {
   flexRender,
   createColumnHelper,
 } from '@tanstack/react-table';
-import { FlagIcon, getCountryFlag } from './FlagIcon';
+import { FlagIcon } from './FlagIcon';
 import { getServiceDescription, getServiceShortName, getServiceCodeOrder } from '../utils/serviceDescriptions';
 
 const columnHelper = createColumnHelper();
@@ -98,10 +98,9 @@ export function DataTable({ data, onRowClick, count }) {
         size: 180,
         cell: info => {
           const code = info.getValue();
-          const flag = getCountryFlag(code);
           return (
             <div className="flex items-center gap-1.5">
-              {flag && <span>{flag}</span>}
+              {code && <FlagIcon countryCode={code} size="sm" />}
               <span>{code || '-'}</span>
             </div>
           );
@@ -348,7 +347,7 @@ export function DataTable({ data, onRowClick, count }) {
                 <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                   {homeState && (
                     <div className="flex items-center gap-1.5">
-                      {getCountryFlag(homeState) && <span>{getCountryFlag(homeState)}</span>}
+                      <FlagIcon countryCode={homeState} size="sm" />
                       <span>{homeState}</span>
                     </div>
                   )}

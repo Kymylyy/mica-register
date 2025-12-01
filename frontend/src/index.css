@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import flag-icons CSS for country flags */
+@import 'flag-icons/css/flag-icons.min.css';
+
 :root {
   /* ============================================
      LAYER 1: BASE PALETTE (RGB values)
