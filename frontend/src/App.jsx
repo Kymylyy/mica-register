@@ -438,7 +438,9 @@ function App() {
                           {selectedEntity.website ? (
                             <>
                               <a
-                                href={selectedEntity.website}
+                                href={selectedEntity.website.startsWith('http://') || selectedEntity.website.startsWith('https://') 
+                                  ? selectedEntity.website 
+                                  : `https://${selectedEntity.website}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-accent hover:underline font-medium"
