@@ -87,16 +87,17 @@ COUNTRY_NAMES = {
 }
 
 def apply_search_filter(query, search: str):
-    """Apply search filter: commercial name, country names, and service names (short/medium/full)"""
+    """Apply search filter: commercial name, LEI name, country names, and service names (short/medium/full)"""
     if not search:
         return query
     
     search_lower = search.lower().strip()
     search_original = search.strip()
     
-    # Build search conditions - only commercial_name
+    # Build search conditions - search both commercial_name AND lei_name
     search_conditions = [
         Entity.commercial_name.ilike(f"%{search_original}%"),
+        Entity.lei_name.ilike(f"%{search_original}%"),
     ]
     
     # Check if search term matches any country name (e.g., "Germany" -> "DE")
