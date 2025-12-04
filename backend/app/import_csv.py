@@ -9,8 +9,21 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
     """Parse date from DD/MM/YYYY format"""
     if not date_str or pd.isna(date_str) or date_str.strip() == "":
         return None
+    
+    # Clean up the date string - remove extra dots, spaces, etc.
+    date_str = date_str.strip()
+    
+    # Fix common errors: "01/12/.2025" -> "01/12/2025"
+    # Remove dots before year if they exist
+    import re
+    date_str = re.sub(r'(\d{2}/\d{2})\.(\d{4})', r'\1/\2', date_str)
+    # Also handle cases like "01/12/ .2025" or "01/12/. 2025"
+    date_str = re.sub(r'(\d{2}/\d{2})\s*\.\s*(\d{4})', r'\1/\2', date_str)
+    # Remove any trailing dots
+    date_str = date_str.rstrip('.')
+    
     try:
-        return datetime.strptime(date_str.strip(), "%d/%m/%Y").date()
+        return datetime.strptime(date_str, "%d/%m/%Y").date()
     except (ValueError, AttributeError):
         return None
 
