@@ -268,16 +268,28 @@ The CSV import process:
 6. **Update Frontend Environment Variable**
    - Go back to Vercel and update `VITE_API_URL` with your Railway backend URL
 
-### First Data Import
+### First Data Import / Updating Data
 
-After deployment, you need to import the initial CSV data:
+After deployment or when CSV data is updated, you need to import the data:
 
-1. **SSH into Railway container** (or use Railway CLI):
+1. **Using the admin endpoint** (recommended):
+   ```bash
+   curl -X POST https://your-app.railway.app/api/admin/import
+   ```
+   Or use the provided script:
+   ```bash
+   ./update_production.sh https://your-app.railway.app
+   ```
+
+2. **Or SSH into Railway container** (using Railway CLI):
    ```bash
    railway run python import_data.py
    ```
 
-2. **Or create an admin endpoint** for data import (recommended for production)
+**Note:** After pushing new CSV data to GitHub:
+- Railway automatically rebuilds with the new CSV file
+- You must call the `/api/admin/import` endpoint to update the database
+- Vercel automatically redeploys the frontend
 
 ## License
 
