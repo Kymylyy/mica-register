@@ -258,6 +258,88 @@ def fix_address_website_parsing(row: pd.Series) -> tuple[Optional[str], Optional
     return (address if address else None, website if website else None)
 
 
+def merge_entities_by_lei(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Merge rows with the same LEI into single rows.
+    Combines services, websites, passport countries, and uses latest dates.
+    """
+    # Group by LEI
+    grouped = df.groupby('ae_lei', dropna=False)
+    
+    merged_rows = []
+    for lei, group in grouped:
+        if pd.isna(lei) or str(lei).strip() == "":
+            # Keep rows without LEI as-is
+            merged_rows.extend(group.to_dict('records'))
+            continue
+        
+        # Get the first row as base
+        base_row = group.iloc[0].to_dict()
+        
+        # Collect all services from all rows
+        all_service_codes = set()
+        for _, row in group.iterrows():
+            service_texts = parse_pipe_separated(row.get('ac_serviceCode'))
+            for service_text in service_texts:
+                normalized = normalize_service_code(service_text)
+                if normalized:
+                    all_service_codes.add(normalized)
+        # Convert back to pipe-separated string format
+        base_row['ac_serviceCode'] = ' | '.join([f"{code}. {MICA_SERVICE_DESCRIPTIONS.get(code, '')}" for code in sorted(all_service_codes)])
+        
+        # Collect all passport countries from all rows
+        all_passport_codes = set()
+        for _, row in group.iterrows():
+            passport_codes = parse_pipe_separated(row.get('ac_serviceCode_cou'))
+            for code in passport_codes:
+                if code.strip():
+                    all_passport_codes.add(code.strip().upper())
+        base_row['ac_serviceCode_cou'] = '|'.join(sorted(all_passport_codes))
+        
+        # Merge websites - combine if different
+        websites = set()
+        for _, row in group.iterrows():
+            website = str(row.get('ae_website', '')).strip() if not pd.isna(row.get('ae_website')) else ''
+            if website and website not in ['', 'nan', 'None']:
+                # Handle multiple websites in one field (space or newline separated)
+                for w in website.replace('\n', ' ').split():
+                    w = w.strip()
+                    if w and w not in ['', 'nan', 'None']:
+                        websites.add(w)
+        if websites:
+            base_row['ae_website'] = ' '.join(sorted(websites))
+        else:
+            base_row['ae_website'] = base_row.get('ae_website', '')
+        
+        # Use latest dates
+        latest_auth_date = None
+        latest_update = None
+        for _, row in group.iterrows():
+            auth_date = parse_date(row.get('ac_authorisationNotificationDate'))
+            last_update = parse_date(row.get('ac_lastupdate'))
+            if auth_date and (not latest_auth_date or auth_date > latest_auth_date):
+                latest_auth_date = auth_date
+            if last_update and (not latest_update or last_update > latest_update):
+                latest_update = last_update
+        
+        if latest_auth_date:
+            base_row['ac_authorisationNotificationDate'] = latest_auth_date.strftime('%d/%m/%Y')
+        if latest_update:
+            base_row['ac_lastupdate'] = latest_update.strftime('%d/%m/%Y')
+        
+        # Use most complete data for other fields (prefer non-empty values)
+        for _, row in group.iterrows():
+            for key in ['ae_competentAuthority', 'ae_homeMemberState', 'ae_lei_name', 'ae_commercial_name', 
+                       'ae_address', 'ae_website_platform', 'ac_comments']:
+                value = row.get(key)
+                if pd.notna(value) and str(value).strip() and (not base_row.get(key) or not str(base_row.get(key)).strip()):
+                    base_row[key] = value
+        
+        merged_rows.append(base_row)
+    
+    return pd.DataFrame(merged_rows)
+
+
 def import_csv_to_db(db: Session, csv_path: str):
     """Import CSV data into database"""
     # Read CSV with proper encoding handling
@@ -287,6 +369,11 @@ def import_csv_to_db(db: Session, csv_path: str):
     for col in text_columns:
         if col in df.columns:
             df[col] = df[col].apply(fix_encoding_issues)
+    
+    # Merge rows with duplicate LEI
+    print(f"Before merging: {len(df)} rows")
+    df = merge_entities_by_lei(df)
+    print(f"After merging by LEI: {len(df)} rows")
     
     # Clear existing data - delete in correct order to handle foreign keys
     from sqlalchemy import text

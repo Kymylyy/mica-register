@@ -453,29 +453,43 @@ function App() {
                       {/* Website */}
                       <div>
                         <dt className="text-xs font-medium text-textSoft mb-0.5">Website</dt>
-                        <dd className="flex items-center gap-2 text-sm text-textMain">
+                        <dd className="flex flex-wrap items-center gap-2 text-sm text-textMain">
                           {selectedEntity.website ? (
-                            <>
-                              <a
-                                href={selectedEntity.website.startsWith('http://') || selectedEntity.website.startsWith('https://') 
-                                  ? selectedEntity.website 
-                                  : `https://${selectedEntity.website}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-accent hover:underline font-medium"
-                              >
-                                {selectedEntity.website}
-                              </a>
-                              <button
-                                onClick={() => handleCopy(selectedEntity.website, 'Website')}
-                                className="text-textSoft hover:text-textMain transition-colors p-1 rounded hover:bg-surfaceAlt"
-                                title="Copy website"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                              </button>
-                            </>
+                            (() => {
+                              // Split website by space to handle multiple URLs
+                              const websites = selectedEntity.website.split(/\s+/).filter(w => w.trim());
+                              return websites.length > 0 ? (
+                                <>
+                                  {websites.map((website, index) => {
+                                    const url = website.startsWith('http://') || website.startsWith('https://') 
+                                      ? website 
+                                      : `https://${website}`;
+                                    return (
+                                      <span key={index} className="flex items-center gap-1">
+                                        <a
+                                          href={url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-accent hover:underline font-medium"
+                                        >
+                                          {website}
+                                        </a>
+                                        <button
+                                          onClick={() => handleCopy(website, 'Website')}
+                                          className="text-textSoft hover:text-textMain transition-colors p-1 rounded hover:bg-surfaceAlt"
+                                          title={`Copy ${website}`}
+                                        >
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                          </svg>
+                                        </button>
+                                        {index < websites.length - 1 && <span className="text-textSoft mx-1">|</span>}
+                                      </span>
+                                    );
+                                  })}
+                                </>
+                              ) : '-';
+                            })()
                           ) : (
                             '-'
                           )}
