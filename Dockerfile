@@ -15,8 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code from backend directory
 COPY backend/ .
 
-# Copy CSV file for data import (if needed)
-COPY casp-register.csv /app/casp-register.csv
+# Copy data directory (contains CSV files)
+COPY data/ /app/data/
+# Import scripts will check data/ directory first, then root for backward compatibility
 
 # Expose port (Railway will set PORT env variable)
 EXPOSE 8000

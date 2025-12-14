@@ -250,7 +250,7 @@ The CSV import process:
 2. **Create New Project**
    - Click "New Project" → "Deploy from GitHub repo"
    - Select your repository
-   - Railway will detect the Dockerfile in `backend/` directory
+   - Railway will use the Dockerfile in the root directory (configured in `railway.json`)
 
 3. **Add PostgreSQL Database**
    - In Railway project, click "New" → "Database" → "PostgreSQL"

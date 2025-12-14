@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 import os
 
-sys.path.insert(0, str(Path(__file__).parent))
+# Add backend directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.database import SessionLocal
 from app.models import Entity, Service
@@ -93,4 +94,3 @@ def test_search_with_existing_joins():
 if __name__ == "__main__":
     success = test_search_with_existing_joins()
     sys.exit(0 if success else 1)
-

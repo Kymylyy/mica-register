@@ -6,4 +6,11 @@ python-multipart==0.0.6
 pydantic==2.5.0
 psycopg2-binary==2.9.9
 
+# Optional dependencies for CSV validation (graceful degradation if not installed)
+pycountry>=23.0.0
+charset-normalizer>=3.0.0
+
+# Testing
+pytest>=7.0.0
+
 

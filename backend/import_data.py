@@ -21,10 +21,13 @@ if __name__ == "__main__":
     
     # Path to CSV file - try multiple locations
     # In Docker container: /app/casp-register.csv
-    # In local development: ../casp-register.csv (relative to backend/)
+    # In local development: check data/ directory and root
     possible_paths = [
         "/app/casp-register.csv",  # Docker container
-        os.path.join(os.path.dirname(__file__), "..", "casp-register.csv"),  # Local dev
+        os.path.join(os.path.dirname(__file__), "..", "data", "casp-register.csv"),  # data/ directory
+        os.path.join(os.path.dirname(__file__), "..", "data", "cleaned", "CASP20251208_clean.csv"),  # cleaned CSV
+        os.path.join(os.path.dirname(__file__), "..", "data", "raw", "CASP20251208.csv"),  # raw CSV
+        os.path.join(os.path.dirname(__file__), "..", "casp-register.csv"),  # root directory
         "casp-register.csv",  # Current directory
     ]
     
