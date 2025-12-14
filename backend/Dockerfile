@@ -1,3 +1,5 @@
+# Dockerfile for local development
+# For Railway deployment, use the root Dockerfile (configured in railway.json)
 FROM python:3.11-slim
 
 WORKDIR /app

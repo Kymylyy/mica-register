@@ -494,8 +494,12 @@ def import_data(db: Session = Depends(get_db)):
     
     # Try multiple locations for CSV file
     possible_paths = [
-        "/app/casp-register.csv",  # Docker container
-        os.path.join(Path(__file__).parent.parent.parent, "casp-register.csv"),  # Local dev
+        "/app/casp-register.csv",  # Docker container (root)
+        "/app/data/casp-register.csv",  # Docker container (data/)
+        "/app/data/cleaned/CASP20251208_clean.csv",  # Docker container (cleaned)
+        "/app/data/raw/CASP20251208.csv",  # Docker container (raw)
+        os.path.join(Path(__file__).parent.parent.parent, "data", "casp-register.csv"),  # Local dev (data/)
+        os.path.join(Path(__file__).parent.parent.parent, "casp-register.csv"),  # Local dev (root)
         "casp-register.csv",  # Current directory
     ]
     

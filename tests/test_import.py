@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 import os
 
-sys.path.insert(0, str(Path(__file__).parent))
+# Add backend directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.database import SessionLocal, engine, Base
 from app.import_csv import import_csv_to_db
@@ -24,10 +25,21 @@ def test_import():
     Base.metadata.create_all(bind=engine)
     print("   ✓ Tables created")
     
-    # Import data
-    csv_path = os.path.join(os.path.dirname(__file__), "..", "casp-register.csv")
-    if not os.path.exists(csv_path):
-        print(f"   ✗ CSV file not found at {csv_path}")
+    # Import data - try multiple locations
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "..", "data", "casp-register.csv"),
+        os.path.join(os.path.dirname(__file__), "..", "casp-register.csv"),
+        os.path.join(os.path.dirname(__file__), "..", "data", "raw", "CASP20251208.csv"),
+    ]
+    
+    csv_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            csv_path = path
+            break
+    
+    if not csv_path:
+        print(f"   ✗ CSV file not found. Tried: {possible_paths}")
         return False
     
     print(f"\n2. Importing data from {csv_path}...")
@@ -86,4 +98,3 @@ def test_import():
 if __name__ == "__main__":
     success = test_import()
     sys.exit(0 if success else 1)
-

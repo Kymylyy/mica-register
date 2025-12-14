@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 import os
 
-sys.path.insert(0, str(Path(__file__).parent))
+# Add backend directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.database import SessionLocal, engine, Base
 from app.models import Entity, Service
@@ -220,4 +221,3 @@ if __name__ == "__main__":
     print("✓ ALL TESTS PASSED!")
     print("=" * 50)
     sys.exit(0)
-

@@ -14,11 +14,14 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
     date_str = date_str.strip()
     
     # Fix common errors: "01/12/.2025" -> "01/12/2025"
-    # Remove dots before year if they exist
+    # Remove dots before year if they exist (handle various formats)
     import re
+    # Handle "DD/MM/.YYYY" or "DD/MM/ .YYYY" (with slash and optional space before dot)
+    date_str = re.sub(r'(\d{2}/\d{2})/\s*\.\s*(\d{4})', r'\1/\2', date_str)
+    # Handle "DD/MM.YYYY" (without slash before dot)
     date_str = re.sub(r'(\d{2}/\d{2})\.(\d{4})', r'\1/\2', date_str)
-    # Also handle cases like "01/12/ .2025" or "01/12/. 2025"
-    date_str = re.sub(r'(\d{2}/\d{2})\s*\.\s*(\d{4})', r'\1/\2', date_str)
+    # Handle "DD/MM .YYYY" (space before dot, no slash)
+    date_str = re.sub(r'(\d{2}/\d{2})\s+\.\s*(\d{4})', r'\1/\2', date_str)
     # Remove any trailing dots
     date_str = date_str.rstrip('.')
     
