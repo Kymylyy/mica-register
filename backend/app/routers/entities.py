@@ -501,7 +501,7 @@ def import_data(db: Session = Depends(get_db)):
     # Works both in Docker and local dev
     base_paths = [
         Path("/app/data/cleaned"),  # Docker container
-        Path(__file__).parent.parent.parent / "data" / "cleaned",  # Local dev
+        Path(__file__).parent.parent.parent.parent / "data" / "cleaned",  # Local dev (from backend/app/routers/ to project root)
     ]
     
     csv_path = None
