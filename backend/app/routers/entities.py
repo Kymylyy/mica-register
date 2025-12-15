@@ -487,32 +487,58 @@ def update_entity(
 
 @router.post("/admin/import")
 def import_data(db: Session = Depends(get_db)):
-    """Import CSV data into database (admin endpoint)"""
+    """Import CSV data into database (admin endpoint)
+    
+    Automatically finds the newest *_clean.csv file in data/cleaned/ directory.
+    Works both in Docker container and local development.
+    """
     import os
     from pathlib import Path
+    from glob import glob
     from ..import_csv import import_csv_to_db
     
-    # Try multiple locations for CSV file
-    possible_paths = [
-        "/app/casp-register.csv",  # Docker container (root)
-        "/app/data/casp-register.csv",  # Docker container (data/)
-        "/app/data/cleaned/CASP20251208_clean.csv",  # Docker container (cleaned)
-        "/app/data/raw/CASP20251208.csv",  # Docker container (raw)
-        os.path.join(Path(__file__).parent.parent.parent, "data", "casp-register.csv"),  # Local dev (data/)
-        os.path.join(Path(__file__).parent.parent.parent, "casp-register.csv"),  # Local dev (root)
-        "casp-register.csv",  # Current directory
+    # Find the newest cleaned CSV file automatically
+    # Works both in Docker and local dev
+    base_paths = [
+        Path("/app/data/cleaned"),  # Docker container
+        Path(__file__).parent.parent.parent / "data" / "cleaned",  # Local dev
     ]
     
     csv_path = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            csv_path = path
-            break
+    newest_file = None
+    newest_time = 0
+    
+    for base_path in base_paths:
+        if base_path.exists():
+            # Find all *_clean.csv files
+            pattern = str(base_path / "*_clean.csv")
+            for file_path in glob(pattern):
+                file_time = os.path.getmtime(file_path)
+                if file_time > newest_time:
+                    newest_time = file_time
+                    newest_file = file_path
+    
+    if newest_file:
+        csv_path = newest_file
+    else:
+        # Fallback: try old locations for backward compatibility
+        possible_paths = [
+            "/app/casp-register.csv",
+            "/app/data/casp-register.csv",
+            os.path.join(Path(__file__).parent.parent.parent, "data", "casp-register.csv"),
+            os.path.join(Path(__file__).parent.parent.parent, "casp-register.csv"),
+            "casp-register.csv",
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                csv_path = path
+                break
     
     if not csv_path:
         raise HTTPException(
             status_code=404, 
-            detail=f"CSV file not found. Tried: {possible_paths}"
+            detail=f"CSV file not found. Checked data/cleaned/ directory for *_clean.csv files and fallback locations."
         )
     
     try:
