@@ -489,10 +489,12 @@ def update_entity(
 def import_data(db: Session = Depends(get_db)):
     """Import CSV data into database (admin endpoint)
     
-    Automatically finds the newest *_clean.csv file in data/cleaned/ directory.
+    Automatically finds the newest *_clean.csv file in data/cleaned/ directory
+    based on date in filename (YYYYMMDD), not file modification time.
     Works both in Docker container and local development.
     """
     import os
+    import re
     from pathlib import Path
     from glob import glob
     from ..import_csv import import_csv_to_db
@@ -506,17 +508,24 @@ def import_data(db: Session = Depends(get_db)):
     
     csv_path = None
     newest_file = None
-    newest_time = 0
+    newest_date = None
+    
+    # Pattern to extract date from filename: CASPYYYYMMDD_clean.csv
+    date_pattern = re.compile(r'CASP(\d{8})_clean\.csv$')
     
     for base_path in base_paths:
         if base_path.exists():
             # Find all *_clean.csv files
             pattern = str(base_path / "*_clean.csv")
             for file_path in glob(pattern):
-                file_time = os.path.getmtime(file_path)
-                if file_time > newest_time:
-                    newest_time = file_time
-                    newest_file = file_path
+                # Extract date from filename
+                match = date_pattern.search(file_path)
+                if match:
+                    file_date_str = match.group(1)  # YYYYMMDD
+                    # Compare dates as strings (YYYYMMDD format sorts correctly)
+                    if newest_date is None or file_date_str > newest_date:
+                        newest_date = file_date_str
+                        newest_file = file_path
     
     if newest_file:
         csv_path = newest_file
