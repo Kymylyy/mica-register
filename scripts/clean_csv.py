@@ -136,8 +136,14 @@ Examples:
     if args.output:
         output_path = args.output
     else:
-        # Default: input_clean.csv
-        output_path = args.input.parent / f"{args.input.stem}_clean{args.input.suffix}"
+        # Default: save to data/cleaned/ directory
+        if 'raw' in str(args.input):
+            # If input is in data/raw/, save to data/cleaned/
+            output_path = Path("data/cleaned") / f"{args.input.stem}_clean{args.input.suffix}"
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            # Otherwise, save in same directory as input
+            output_path = args.input.parent / f"{args.input.stem}_clean{args.input.suffix}"
 
     # Create cleaner
     cleaner = CSVCleaner(args.input)
@@ -173,14 +179,22 @@ Examples:
         print("\n🔍 Dry run completed. Use without --dry-run to create cleaned file.")
 
     # Save report if requested
+    # Save cleaning report
     if args.report:
-        try:
-            with open(args.report, "w", encoding="utf-8") as f:
-                json.dump(report, f, indent=2, ensure_ascii=False)
-            print(f"📄 Cleaning report saved to: {args.report}")
-        except Exception as e:
-            print(f"Error saving report: {e}", file=sys.stderr)
-            return 1
+        report_path = args.report
+    else:
+        # Auto-save to reports/cleaning/
+        report_dir = Path("reports/cleaning")
+        report_dir.mkdir(parents=True, exist_ok=True)
+        report_path = report_dir / f"cleaning_{args.input.stem}.json"
+    
+    try:
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+        print(f"📄 Cleaning report saved to: {report_path}")
+    except Exception as e:
+        print(f"Error saving report: {e}", file=sys.stderr)
+        return 1
 
     return 0
 

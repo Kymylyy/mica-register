@@ -168,15 +168,31 @@ Examples:
     # Print human-readable summary
     print_summary(report, strict=args.strict)
 
-    # Save JSON report if requested
+    # Save JSON report
     if args.report:
-        try:
-            with open(args.report, "w", encoding="utf-8") as f:
-                json.dump(report, f, indent=2, ensure_ascii=False)
-            print(f"\nJSON report saved to: {args.report}")
-        except Exception as e:
-            print(f"Error saving JSON report: {e}", file=sys.stderr)
-            return 2
+        report_path = args.report
+    else:
+        # Auto-determine report path based on input file location
+        csv_name = args.csv_file.stem
+        if 'raw' in str(args.csv_file):
+            report_dir = Path("reports/validation/raw")
+        elif 'clean' in str(args.csv_file) or 'llm' in str(args.csv_file):
+            if 'llm' in str(args.csv_file):
+                report_dir = Path("reports/validation/final")
+            else:
+                report_dir = Path("reports/validation/clean")
+        else:
+            report_dir = Path("reports/validation/raw")
+        report_dir.mkdir(parents=True, exist_ok=True)
+        report_path = report_dir / f"validation_{csv_name}.json"
+    
+    try:
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+        print(f"\nJSON report saved to: {report_path}")
+    except Exception as e:
+        print(f"Error saving JSON report: {e}", file=sys.stderr)
+        return 2
 
     # Determine and return exit code
     exit_code = determine_exit_code(report, strict=args.strict)

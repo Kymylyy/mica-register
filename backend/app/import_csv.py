@@ -344,39 +344,31 @@ def merge_entities_by_lei(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def import_csv_to_db(db: Session, csv_path: str):
-    """Import CSV data into database"""
-    # Read CSV with proper encoding handling
-    # Try multiple encodings to handle special characters (German umlauts, etc.)
-    encodings = ['utf-8-sig', 'utf-8', 'latin-1', 'iso-8859-1', 'cp1252', 'windows-1252']
-    df = None
+    """
+    Import CSV data into database.
     
-    for encoding in encodings:
-        try:
-            # Use errors='replace' to handle any problematic characters
-            df = pd.read_csv(csv_path, encoding=encoding, encoding_errors='replace')
-            print(f"Successfully read CSV with encoding: {encoding}")
-            break
-        except (UnicodeDecodeError, UnicodeError):
-            continue
+    Expects a cleaned CSV file (from csv_clean.py) with:
+    - UTF-8 encoding
+    - Already fixed encoding issues
+    - Already merged duplicate LEI rows
+    - Already normalized service codes, commercial names, addresses, etc.
     
-    if df is None:
-        # Last resort: try with errors='replace' on utf-8
+    This function only handles:
+    - Reading the cleaned CSV
+    - Parsing dates and pipe-separated values
+    - Creating database entities
+    """
+    # Read cleaned CSV (should be UTF-8, already cleaned)
+    try:
+        df = pd.read_csv(csv_path, encoding='utf-8-sig')
+        print(f"Successfully read cleaned CSV file: {csv_path}")
+    except UnicodeDecodeError:
+        # Fallback for edge cases
         try:
             df = pd.read_csv(csv_path, encoding='utf-8', encoding_errors='replace')
-            print("Successfully read CSV with encoding: utf-8 (with error replacement)")
+            print("Read CSV with UTF-8 fallback encoding")
         except Exception as e:
-            raise ValueError(f"Could not read CSV file. Error: {e}")
-    
-    # Fix encoding issues in text columns
-    text_columns = ['ae_address', 'ae_commercial_name', 'ae_lei_name', 'ac_competentAuthority', 'ac_comments']
-    for col in text_columns:
-        if col in df.columns:
-            df[col] = df[col].apply(fix_encoding_issues)
-    
-    # Merge rows with duplicate LEI
-    print(f"Before merging: {len(df)} rows")
-    df = merge_entities_by_lei(df)
-    print(f"After merging by LEI: {len(df)} rows")
+            raise ValueError(f"Could not read CSV file. Expected cleaned UTF-8 file. Error: {e}")
     
     # Clear existing data - delete in correct order to handle foreign keys
     from sqlalchemy import text
@@ -402,15 +394,16 @@ def import_csv_to_db(db: Session, csv_path: str):
         end_date = parse_date(row.get('ac_authorisationEndDate'))
         last_update = parse_date(row.get('ac_lastupdate'))
         
-        # Parse services and countries first (remove duplicates)
+        # Parse services - CSV should already have normalized format "a. description | b. description"
+        # Extract service codes (letters a-j) from the normalized format
         service_texts = parse_pipe_separated(row.get('ac_serviceCode'))
-        # Normalize service codes to standard MiCA codes (a-j)
-        normalized_codes = []
+        service_codes = []
         for service_text in service_texts:
+            # Extract code from format "a. description" or just "a"
             normalized = normalize_service_code(service_text)
             if normalized:
-                normalized_codes.append(normalized)
-        service_codes = list(set(normalized_codes))  # Remove duplicates
+                service_codes.append(normalized)
+        service_codes = list(set(service_codes))  # Remove duplicates
         
         passport_codes = list(set([c.strip().upper() for c in parse_pipe_separated(row.get('ac_serviceCode_cou')) if c.strip()]))
         
@@ -435,8 +428,9 @@ def import_csv_to_db(db: Session, csv_path: str):
                 seen_countries.add(country_key)
                 countries.append(country)
         
-        # Fix address/website parsing issues (when comma in address causes mis-parsing)
-        fixed_address, fixed_website = fix_address_website_parsing(row)
+        # Get address and website - should already be fixed in cleaning stage
+        address = str(row.get('ae_address', '')).strip() if not pd.isna(row.get('ae_address')) and str(row.get('ae_address')).strip() else None
+        website = str(row.get('ae_website', '')).strip() if not pd.isna(row.get('ae_website')) and str(row.get('ae_website')).strip() else None
         
         # Create entity with relationships
         entity = Entity(
@@ -445,9 +439,9 @@ def import_csv_to_db(db: Session, csv_path: str):
             lei_name=str(row.get('ae_lei_name', '')).strip() if not pd.isna(row.get('ae_lei_name')) else None,
             lei=str(row.get('ae_lei', '')).strip() if not pd.isna(row.get('ae_lei')) else None,
             lei_cou_code=str(row.get('ae_lei_cou_code', '')).strip() if not pd.isna(row.get('ae_lei_cou_code')) else None,
-            commercial_name=normalize_commercial_name(row.get('ae_commercial_name')),
-            address=fixed_address,
-            website=fixed_website,
+            commercial_name=str(row.get('ae_commercial_name', '')).strip() if not pd.isna(row.get('ae_commercial_name')) else None,
+            address=address,
+            website=website,
             website_platform=str(row.get('ae_website_platform', '')).strip() if not pd.isna(row.get('ae_website_platform')) else None,
             authorisation_notification_date=auth_date,
             authorisation_end_date=end_date,

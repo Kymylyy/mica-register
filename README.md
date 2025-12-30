@@ -203,14 +203,37 @@ The application uses standard MiCA service codes (a-j):
 - **i** - Providing portfolio management on crypto-assets
 - **j** - Providing transfer services for crypto-assets on behalf of clients
 
-## Data Import
+## Data Import Pipeline
 
-The CSV import process:
-1. Tries multiple encodings (UTF-8, Latin-1, Windows-1252, etc.)
-2. Fixes encoding issues (German characters, broken quotation marks)
-3. Normalizes service codes to MiCA standard (a-j)
-4. Handles pipe-separated values for services and passport countries
-5. Creates relationships between entities, services, and countries
+The CSV import process follows a multi-stage pipeline:
+
+### 1. Validation
+- Detects encoding (UTF-8, Latin-1, Windows-1252, etc.)
+- Validates CSV structure, schema, and data formats
+- Identifies errors and warnings
+- Generates validation reports
+
+### 2. Cleaning (Deterministic)
+- Fixes encoding issues (German characters, broken quotation marks)
+- Normalizes service codes to MiCA standard (a-j)
+- Fixes date formats (DD/MM/YYYY)
+- Merges duplicate LEI entries
+- Normalizes country codes and commercial names
+- Handles pipe-separated values for services and passport countries
+- Generates cleaning reports
+
+### 3. LLM Remediation (Optional)
+- Uses Gemini API to fix edge cases that deterministic cleaning couldn't handle
+- Operates with strict guardrails and full auditability
+- Only processes remaining errors after deterministic cleaning
+- Generates remediation patches with confidence scores
+
+### 4. Import
+- Imports cleaned CSV to database
+- Creates relationships between entities, services, and countries
+- Automatically finds the newest cleaned CSV file
+
+See `UPDATE_DATA.md` for detailed instructions on updating data.
 
 ## Development
 
@@ -270,9 +293,26 @@ The CSV import process:
 
 ### First Data Import / Updating Data
 
-After deployment or when CSV data is updated, you need to import the data:
+After deployment or when CSV data is updated, follow the complete pipeline:
 
-1. **Using the admin endpoint** (recommended):
+1. **Validate raw CSV:**
+   ```bash
+   python scripts/validate_csv.py data/raw/CASP20251215.csv
+   ```
+
+2. **Clean CSV:**
+   ```bash
+   python scripts/clean_csv.py --input data/raw/CASP20251215.csv
+   ```
+
+3. **Optional: LLM Remediation** (if errors remain):
+   ```bash
+   python scripts/generate_remediation_tasks.py data/cleaned/CASP20251215_clean.csv reports/validation/clean/validation_CASP20251215_clean.json
+   python scripts/run_llm_remediation.py reports/remediation/tasks/tasks_CASP20251215_clean.json
+   python scripts/apply_remediation_patch.py data/cleaned/CASP20251215_clean.csv reports/remediation/patches/patch_*.json reports/remediation/tasks/tasks_CASP20251215_clean.json
+   ```
+
+4. **Import to database:**
    ```bash
    curl -X POST https://your-app.railway.app/api/admin/import
    ```
@@ -281,15 +321,12 @@ After deployment or when CSV data is updated, you need to import the data:
    ./update_production.sh https://your-app.railway.app
    ```
 
-2. **Or SSH into Railway container** (using Railway CLI):
-   ```bash
-   railway run python import_data.py
-   ```
-
 **Note:** After pushing new CSV data to GitHub:
 - Railway automatically rebuilds with the new CSV file
 - You must call the `/api/admin/import` endpoint to update the database
 - Vercel automatically redeploys the frontend
+
+See `UPDATE_DATA.md` for detailed step-by-step instructions.
 
 ## License
 
@@ -301,7 +338,7 @@ The application is in active development. Production deployment is ready - see D
 
 ### Known Issues
 - "Last updated" timestamp in header shows placeholder - needs API endpoint
-- Automatic data download from ESMA website not yet implemented
+- Automatic data download from ESMA website not yet implemented (planned for cron job automation)
 
 ## Notes
 

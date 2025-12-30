@@ -11,17 +11,32 @@ Ten dokument opisuje krok po kroku, jak zaktualizować dane na stronie WWW, gdy 
 
 ## 📁 Struktura katalogów
 
-Projekt używa następującej struktury dla plików CSV:
+Projekt używa następującej struktury dla plików CSV i raportów:
 
 ```
 data/
 ├── raw/              # Surowe pliki CSV pobrane z ESMA
 │   └── CASP20251215.csv
 └── cleaned/          # Oczyszczone pliki CSV gotowe do importu
-    └── CASP20251215_clean.csv
+    ├── CASP20251215_clean.csv
+    └── CASP20251215_clean_llm.csv  # Po LLM remediation (opcjonalnie)
+
+reports/
+├── validation/       # Raporty walidacji
+│   ├── raw/         # Raporty dla surowych plików
+│   ├── clean/       # Raporty dla wyczyszczonych plików
+│   └── final/       # Raporty dla finalnych plików (po LLM)
+├── cleaning/        # Raporty z operacji czyszczenia
+└── remediation/     # Pliki LLM remediation
+    ├── tasks/       # Wygenerowane zadania remediacji
+    ├── patches/     # Patch'e wygenerowane przez LLM
+    └── apply/       # Raporty zastosowania patch'y
 ```
 
-**Ważne:** Endpoint importu automatycznie znajduje najnowszy plik `*_clean.csv` w katalogu `data/cleaned/`, więc nie musisz aktualizować kodu przy każdym nowym pliku.
+**Ważne:** 
+- Endpoint importu automatycznie znajduje najnowszy plik `*_clean.csv` (lub `*_clean_llm.csv` jeśli użyto LLM) w katalogu `data/cleaned/`
+- Wszystkie raporty są automatycznie zapisywane w odpowiednich podkatalogach `reports/`
+- Pliki w `reports/` są ignorowane przez git (zobacz `.gitignore`)
 
 ## 🔄 Proces aktualizacji
 
@@ -48,6 +63,17 @@ Skrypt pokaże:
 - Błędy (ERROR) - wymagają naprawy przed importem
 - Ostrzeżenia (WARNING) - mogą być automatycznie naprawione podczas czyszczenia
 
+Raport JSON zostanie automatycznie zapisany w `reports/validation/raw/validation_CASP20251215.json`.
+
+**Sprawdzenie liczby błędów i ostrzeżeń:**
+```bash
+# Użyj grep (wielkie litery)
+cat reports/validation/raw/validation_CASP20251215.json | python3 -m json.tool | grep -E "(Errors|Warnings)"
+
+# Lub użyj Python
+python3 -c "import json; d=json.load(open('reports/validation/raw/validation_CASP20251215.json')); print(f'Errors: {d[\"stats\"][\"errors\"]}, Warnings: {d[\"stats\"][\"warnings\"]}')"
+```
+
 **Uwaga:** Jeśli są tylko ostrzeżenia, możesz przejść do następnego kroku - skrypt czyszczący automatycznie je naprawi.
 
 ### Krok 3: Oczyszczenie pliku CSV
@@ -56,10 +82,12 @@ Skrypt automatycznie naprawi wszystkie wykryte problemy (encoding, daty, białe 
 
 ```bash
 # Z głównego katalogu projektu
-python scripts/clean_csv.py --input data/raw/CASP20251215.csv --output data/cleaned/CASP20251215_clean.csv
+python scripts/clean_csv.py --input data/raw/CASP20251215.csv
 ```
 
-To utworzy oczyszczony plik `CASP20251215_clean.csv` w katalogu `data/cleaned/`.
+Skrypt automatycznie:
+- Utworzy wyczyszczony plik `CASP20251215_clean.csv` w katalogu `data/cleaned/`
+- Zapisze raport z czyszczenia w `reports/cleaning/cleaning_CASP20251215.json`
 
 **Co jest naprawiane automatycznie:**
 - Błędy encoding (np. `Stra�e` → `Straße`)
@@ -69,11 +97,12 @@ To utworzy oczyszczony plik `CASP20251215_clean.csv` w katalogu `data/cleaned/`.
 - Problemy z formatem LEI
 - Wielowierszowe pola
 - Normalizacja kodów krajów i usług
+- Parsowanie adresów i stron WWW
 
-**Opcjonalnie:** Możesz zapisać raport z czyszczenia:
+**Opcjonalnie:** Możesz podać własną ścieżkę wyjściową:
 
 ```bash
-python scripts/clean_csv.py --input data/raw/CASP20251215.csv --output data/cleaned/CASP20251215_clean.csv --report cleaning_report.json
+python scripts/clean_csv.py --input data/raw/CASP20251215.csv --report cleaning_report.json
 ```
 
 ### Krok 4: Zaktualizuj datę w frontendzie
@@ -114,11 +143,63 @@ Możesz sprawdzić status:
 - Railway dashboard → Twój projekt → Deployments
 - Vercel dashboard → Twój projekt → Deployments
 
-### Krok 7: Wywołaj import danych na Railway
+### Krok 4: Walidacja wyczyszczonego pliku
+
+Sprawdź czy po czyszczeniu nadal są błędy:
+
+```bash
+python scripts/validate_csv.py data/cleaned/CASP20251215_clean.csv
+```
+
+Raport zostanie zapisany w `reports/validation/clean/validation_CASP20251215_clean.json`.
+
+**Sprawdzenie liczby pozostałych błędów:**
+```bash
+python3 -c "import json; d=json.load(open('reports/validation/clean/validation_CASP20251215_clean.json')); print(f'Errors: {d[\"stats\"][\"errors\"]}, Warnings: {d[\"stats\"][\"warnings\"]}')"
+```
+
+### Krok 5: (Opcjonalne) LLM Remediation dla pozostałych błędów
+
+Jeśli po czyszczeniu nadal są błędy, możesz użyć LLM remediation do naprawy edge cases:
+
+```bash
+# 1. Wygeneruj remediation tasks z validation report
+python scripts/generate_remediation_tasks.py \
+  data/cleaned/CASP20251215_clean.csv \
+  reports/validation/clean/validation_CASP20251215_clean.json \
+  --max-tasks 50
+
+# Zadania zostaną zapisane w reports/remediation/tasks/tasks_CASP20251215_clean.json
+
+# 2. Uruchom LLM remediation (wymaga GEMINI_API_KEY w .env)
+python scripts/run_llm_remediation.py \
+  reports/remediation/tasks/tasks_CASP20251215_clean.json
+
+# Patch zostanie zapisany w reports/remediation/patches/patch_*.json
+
+# 3. Zastosuj patch (wymaga manual approval domyślnie)
+python scripts/apply_remediation_patch.py \
+  data/cleaned/CASP20251215_clean.csv \
+  reports/remediation/patches/patch_*.json \
+  reports/remediation/tasks/tasks_CASP20251215_clean.json \
+  --out data/cleaned/CASP20251215_clean_llm.csv
+
+# Raport zostanie zapisany w reports/remediation/apply/apply_CASP20251215_clean.json
+
+# 4. Walidacja finalnego pliku (MUSI przejść)
+python scripts/validate_csv.py data/cleaned/CASP20251215_clean_llm.csv
+```
+
+**Uwaga:** 
+- LLM remediation jest opcjonalne. Jeśli nie używasz, przejdź do kroku 6.
+- Wymaga ustawienia `GEMINI_API_KEY` w pliku `.env` (zobacz `.env.example`)
+- Wszystkie pliki są automatycznie zapisywane w odpowiednich katalogach `reports/`
+
+### Krok 6: Wywołaj import danych na Railway
 
 **To jest najważniejszy krok!** Railway ma nowy CSV w kontenerze, ale dane w bazie nie aktualizują się automatycznie.
 
-Endpoint `/api/admin/import` automatycznie znajdzie najnowszy plik `*_clean.csv` w katalogu `data/cleaned/`.
+Endpoint `/api/admin/import` automatycznie znajdzie najnowszy plik `*_clean.csv` (lub `*_clean_llm.csv` jeśli użyto LLM) w katalogu `data/cleaned/`.
 
 #### Opcja A: Użyj skryptu (zalecane)
 
@@ -143,7 +224,7 @@ curl -X POST https://mica-register-production.up.railway.app/api/admin/import
 
 **Ważne:** Sprawdź czy `csv_path` wskazuje na najnowszy plik i czy `entities_count` się zgadza.
 
-### Krok 8: Sprawdź czy wszystko działa
+### Krok 7: Sprawdź czy wszystko działa
 
 1. Otwórz stronę WWW
 2. Sprawdź czy liczba entities się zgadza (powinna być widoczna w headerze)
@@ -199,8 +280,10 @@ curl -X POST https://mica-register-production.up.railway.app/api/admin/import
 - [ ] Pobrano nowy plik CSV z ESMA
 - [ ] Plik zapisany w `data/raw/CASPYYYYMMDD.csv`
 - [ ] (Opcjonalnie) Uruchomiono walidację: `python scripts/validate_csv.py data/raw/CASPYYYYMMDD.csv`
-- [ ] Uruchomiono czyszczenie: `python scripts/clean_csv.py --input data/raw/CASPYYYYMMDD.csv --output data/cleaned/CASPYYYYMMDD_clean.csv`
+- [ ] Uruchomiono czyszczenie: `python scripts/clean_csv.py --input data/raw/CASPYYYYMMDD.csv`
 - [ ] Sprawdzono czy plik `*_clean.csv` został utworzony w `data/cleaned/`
+- [ ] (Opcjonalnie) Uruchomiono walidację wyczyszczonego pliku: `python scripts/validate_csv.py data/cleaned/CASPYYYYMMDD_clean.csv`
+- [ ] (Opcjonalnie) Jeśli są błędy: uruchomiono LLM remediation (krok 5)
 - [ ] Zaktualizowano datę w `frontend/src/App.jsx`
 - [ ] Zrobiono commit i push na GitHub
 - [ ] Poczekano na deployment Railway i Vercel (2-5 minut)
@@ -208,12 +291,23 @@ curl -X POST https://mica-register-production.up.railway.app/api/admin/import
 - [ ] Sprawdzono odpowiedź endpointu (czy użył najnowszego pliku i czy liczba entities się zgadza)
 - [ ] Sprawdzono czy strona WWW pokazuje nowe dane
 
+## 🔄 Automatyzacja (Planowane)
+
+W przyszłości planujemy zautomatyzować cały proces:
+- Automatyczne sprawdzanie strony ESMA pod kątem nowych aktualizacji
+- Automatyczne pobieranie najnowszego pliku CSV
+- Automatyczne uruchomienie pełnego pipeline'u (walidacja → cleaning → LLM → import)
+- Cron job do regularnego sprawdzania i aktualizacji
+
+Zobacz `TODO.md` dla szczegółów dotyczących automatyzacji.
+
 ## 🔗 Przydatne linki
 
 - **Railway Dashboard:** https://railway.app
 - **Vercel Dashboard:** https://vercel.com
 - **ESMA Register:** https://www.esma.europa.eu/press-news/esma-news/esma-publishes-first-list-crypto-asset-service-providers-casps-authorised-under-mica
 - **Railway API URL:** https://mica-register-production.up.railway.app
+- **LLM Remediation Documentation:** `docs/LLM_REMEDIATION_DESIGN.md`
 
 ## 📞 Kontakt / Wsparcie
 

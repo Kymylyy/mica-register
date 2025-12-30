@@ -726,6 +726,10 @@ def validate_csv(file_path: Path, max_examples: int = 5) -> Dict[str, Any]:
     validate_multiline_fields(rows, header, issues)
     validate_encoding(rows, header, issues)
 
+    # Count issues by severity
+    error_count = sum(1 for issue in issues if issue.severity == Severity.ERROR)
+    warning_count = sum(1 for issue in issues if issue.severity == Severity.WARNING)
+    
     # Build report
     report = {
         "version": 1,
@@ -737,6 +741,11 @@ def validate_csv(file_path: Path, max_examples: int = 5) -> Dict[str, Any]:
             "rows_parsed": rows_parsed,
             "columns": len(header),
             "header": header,
+            "errors": error_count,
+            "warnings": warning_count,
+            # Aliases with capital letters for grep compatibility
+            "Errors": error_count,
+            "Warnings": warning_count,
         },
         "issues": [issue.to_dict(max_examples) for issue in issues],
     }

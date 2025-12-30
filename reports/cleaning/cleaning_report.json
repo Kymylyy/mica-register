@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generated_at": "2025-12-25T11:11:30.229318Z",
-  "input_file": "data/raw/CASP20251223.csv",
+  "generated_at": "2025-12-30T19:27:29.437911Z",
+  "input_file": "data/raw/CASPS-tests.csv",
   "encoding": {
     "detected": "UTF-8-SIG",
     "confidence": 0.9954,
@@ -171,7 +171,7 @@
       "type": "WHITESPACE_FIXED",
       "row": 133,
       "column": "ae_address",
-      "old_value": "Suché mýto 6, 811 03 Bratislava, Slovakia\r\n",
+      "old_value": "Suché mýto 6, 811 03 Bratislava, Slovakia\n",
       "new_value": "Suché mýto 6, 811 03 Bratislava, Slovakia"
     },
     {
@@ -220,7 +220,7 @@
       "type": "WHITESPACE_FIXED",
       "row": 79,
       "column": "ae_website",
-      "old_value": "www.skrill.com\r\nwww.neteller.com",
+      "old_value": "www.skrill.com\nwww.neteller.com",
       "new_value": "www.skrill.com www.neteller.com"
     },
     {
@@ -1163,5 +1163,5 @@
       "COMMERCIAL_NAME_NORMALIZED": 1
     }
   },
-  "output_file": "data/cleaned/CASP20251223_clean.csv"
+  "output_file": "data/cleaned/CASPS-tests_clean.csv"
 }
