@@ -25,11 +25,12 @@ def test_import():
     Base.metadata.create_all(bind=engine)
     print("   ✓ Tables created")
     
-    # Import data - try multiple locations
+    # Import data - try cleaned CSV files (import_csv_to_db expects cleaned CSV)
     possible_paths = [
-        os.path.join(os.path.dirname(__file__), "..", "data", "casp-register.csv"),
-        os.path.join(os.path.dirname(__file__), "..", "casp-register.csv"),
-        os.path.join(os.path.dirname(__file__), "..", "data", "raw", "CASP20251208.csv"),
+        os.path.join(os.path.dirname(__file__), "..", "data", "cleaned", "CASP20251223_clean.csv"),
+        os.path.join(os.path.dirname(__file__), "..", "data", "cleaned", "CASP20251215_clean.csv"),
+        os.path.join(os.path.dirname(__file__), "..", "data", "cleaned", "*.csv"),  # Fallback pattern
+        os.path.join(os.path.dirname(__file__), "..", "data", "casp-register.csv"),  # Legacy fallback
     ]
     
     csv_path = None
