@@ -10,9 +10,9 @@ fi
 
 RAILWAY_URL=$1
 echo "Importing data to Railway at: $RAILWAY_URL"
-echo "Calling POST $RAILWAY_URL/admin/import"
+echo "Calling POST $RAILWAY_URL/api/admin/import"
 
-curl -X POST "$RAILWAY_URL/admin/import" \
+curl -X POST "$RAILWAY_URL/api/admin/import" \
     -H "Content-Type: application/json" \
     -v
 
