@@ -333,6 +333,8 @@ jobs:
 
 ## 📝 Implementation Phases
 
+**Note**: Phases 7-8 are additional tasks beyond the LLM remediation feature.
+
 ### Phase 1: Design & Schemas (Priority: High)
 - [ ] Create `docs/LLM_REMEDIATION_DESIGN.md`
 - [ ] Define Pydantic models in `backend/app/remediation/schemas.py`
@@ -371,6 +373,21 @@ jobs:
 - [ ] `.github/workflows/update_data.yml` (GitHub Actions)
 - [ ] Notification system (webhook/email)
 
+### Phase 7: Import Logic Refactoring (Priority: High)
+- [ ] Refactor `backend/app/import_csv.py` to remove all cleaning logic
+- [ ] Move `fix_encoding_issues()` calls to `backend/app/csv_clean.py`
+- [ ] Move `merge_entities_by_lei()` logic to `backend/app/csv_clean.py`
+- [ ] Move `normalize_service_code()` calls to `backend/app/csv_clean.py`
+- [ ] Move `fix_address_website_parsing()` to `backend/app/csv_clean.py`
+- [ ] Move `normalize_commercial_name()` to `backend/app/csv_clean.py`
+- [ ] Ensure `import_csv_to_db()` only reads clean CSV and imports to database (no transformations)
+- [ ] Update tests to reflect separation of concerns
+- [ ] Update documentation (`UPDATE_DATA.md`) to clarify that cleaning must happen before import
+
+### Phase 8: Frontend UI Update (Priority: Low)
+- [ ] Change "FEEDBACK / ISSUES" label to "GET MiCA LICENSE" in `frontend/src/App.jsx`
+- [ ] Update related comments/documentation if needed
+
 ## 🎯 Success Criteria
 
 - ✅ Pipeline działa bez LLM (graceful degradation)
@@ -388,8 +405,11 @@ jobs:
 - **Phase 4**: 4-6 godzin (CLI scripts)
 - **Phase 5**: 6-8 godzin (tests)
 - **Phase 6**: 4-6 godzin (cron job)
+- **Phase 7**: 3-4 godziny (import logic refactoring)
+- **Phase 8**: 0.5 godziny (frontend UI update)
 
-**Total**: ~26-38 godzin
+**Total (Phases 1-6)**: ~26-38 godzin  
+**Total (All phases)**: ~29.5-42.5 godzin
 
 ## 🔗 Powiązane pliki
 
