@@ -40,6 +40,38 @@ reports/
 
 ## 🔄 Proces aktualizacji
 
+### Metoda A: Automatyczny skrypt orchestracji (Zalecane)
+
+Najprostszy sposób - użyj skryptu, który automatycznie sprawdzi ESMA, pobierze plik i przeprowadzi cały pipeline:
+
+```bash
+python scripts/update_esma_data.py
+```
+
+Skrypt automatycznie:
+1. Sprawdzi czy ESMA zaktualizowała rejestr (porówna daty)
+2. Pobierze najnowszy plik CSV z ESMA
+3. Zwaliduje surowy plik
+4. Wyczyści plik automatycznie
+5. Zwaliduje wyczyszczony plik
+6. (Opcjonalnie) Uruchomi LLM remediation jeśli są błędy
+7. Przygotuje pliki gotowe do importu
+
+**Po zakończeniu skryptu musisz ręcznie:**
+- Zrobić commit i push do GitHub
+- Poczekać na deployment Railway
+- Wywołać endpoint importu: `./update_production.sh <YOUR_RAILWAY_URL>`
+
+**Wymagania:**
+- Python 3.11+
+- Zainstalowane zależności: `pip install -r backend/requirements.txt`
+- Playwright browsers: `python3 -m playwright install chromium`
+- (Opcjonalnie) `GEMINI_API_KEY` w zmiennych środowiskowych dla LLM remediation
+
+### Metoda B: Ręczny proces krok po kroku
+
+Jeśli wolisz pełną kontrolę nad każdym krokiem:
+
 ### Krok 1: Pobierz nowy plik CSV z ESMA
 
 1. Pobierz najnowszy plik CSV z [ESMA Register](https://www.esma.europa.eu/press-news/esma-news/esma-publishes-first-list-crypto-asset-service-providers-casps-authorised-under-mica)
@@ -291,15 +323,23 @@ curl -X POST https://mica-register-production.up.railway.app/api/admin/import
 - [ ] Sprawdzono odpowiedź endpointu (czy użył najnowszego pliku i czy liczba entities się zgadza)
 - [ ] Sprawdzono czy strona WWW pokazuje nowe dane
 
-## 🔄 Automatyzacja (Planowane)
+## 🔄 Automatyzacja
 
-W przyszłości planujemy zautomatyzować cały proces:
+### Obecny stan
+
+✅ **Zaimplementowane:**
 - Automatyczne sprawdzanie strony ESMA pod kątem nowych aktualizacji
 - Automatyczne pobieranie najnowszego pliku CSV
 - Automatyczne uruchomienie pełnego pipeline'u (walidacja → cleaning → LLM → import)
-- Cron job do regularnego sprawdzania i aktualizacji
+- Skrypt orchestracji: `scripts/update_esma_data.py`
 
-Zobacz `TODO.md` dla szczegółów dotyczących automatyzacji.
+⏳ **Do zaimplementowania (planowane):**
+- Automatyczny commit i push do GitHub
+- Automatyczne wywołanie Railway API importu
+- Cron job do regularnego sprawdzania i aktualizacji
+- Notyfikacje (email/Slack) po aktualizacji
+
+Zobacz `TODO.md` dla szczegółów dotyczących pełnej automatyzacji.
 
 ## 🔗 Przydatne linki
 

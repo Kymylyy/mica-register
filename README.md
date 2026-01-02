@@ -293,7 +293,31 @@ See `UPDATE_DATA.md` for detailed instructions on updating data.
 
 ### First Data Import / Updating Data
 
-After deployment or when CSV data is updated, follow the complete pipeline:
+#### Option A: Automated Orchestration Script (Recommended)
+
+Use the orchestration script to automatically check for ESMA updates, download, validate, clean, and prepare files:
+
+```bash
+python scripts/update_esma_data.py
+```
+
+This script will:
+1. Check ESMA website for updates
+2. Download the latest CSV if an update is available
+3. Validate the raw CSV file
+4. Clean the CSV file automatically
+5. Validate the cleaned file
+6. Optionally run LLM remediation if errors remain (requires `GEMINI_API_KEY`)
+7. Prepare files for manual import
+
+After the script completes, you'll need to:
+- Commit and push the files to GitHub
+- Wait for Railway deployment
+- Call the import endpoint: `./update_production.sh <YOUR_RAILWAY_URL>`
+
+#### Option B: Manual Step-by-Step Process
+
+If you prefer manual control, follow the complete pipeline:
 
 1. **Validate raw CSV:**
    ```bash
@@ -338,7 +362,7 @@ The application is in active development. Production deployment is ready - see D
 
 ### Known Issues
 - "Last updated" timestamp in header shows placeholder - needs API endpoint
-- Automatic data download from ESMA website not yet implemented (planned for cron job automation)
+- Full automation (git commit/push and Railway import) not yet implemented - currently requires manual steps after orchestration script
 
 ## Notes
 
