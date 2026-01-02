@@ -27,9 +27,11 @@ Zamknięcie całej logiki sprawdzania strony WWW ESMA, pobierania pliku CSV, prz
 
 ### 3. Skrypt automatyzacji
 
-- [ ] Utworzenie głównego skryptu `scripts/update_esma_data.py` (lub `.sh`)
-- [ ] Integracja wszystkich kroków pipeline'u
-- [ ] Obsługa błędów i logowanie
+- [x] Utworzenie głównego skryptu `scripts/update_esma_data.py` (lub `.sh`)
+- [x] Integracja wszystkich kroków pipeline'u (sprawdzanie ESMA, pobieranie, walidacja, cleaning, LLM)
+- [x] Obsługa błędów i logowanie
+- [ ] Automatyczny commit i push do GitHub
+- [ ] Automatyczne wywołanie Railway API importu
 - [ ] Notyfikacje (email/Slack/webhook) z raportem
 - [ ] Konfiguracja przez plik `.env` lub `config.yaml`
 
@@ -107,9 +109,10 @@ def main():
 ## 🎯 Success Criteria
 
 - ✅ Skrypt automatycznie sprawdza ESMA i pobiera nowy plik
-- ✅ Pełny pipeline (walidacja → cleaning → LLM → import) działa automatycznie
-- ✅ Cron job uruchamia się zgodnie z harmonogramem
-- ✅ Notyfikacje są wysyłane po każdej aktualizacji
+- ✅ Pełny pipeline (walidacja → cleaning → LLM) działa automatycznie
+- ⏳ Automatyczny commit/push i Railway import (w trakcie)
+- ⏳ Cron job uruchamia się zgodnie z harmonogramem (planowane)
+- ⏳ Notyfikacje są wysyłane po każdej aktualizacji (planowane)
 - ✅ Wszystkie błędy są logowane i raportowane
 - ✅ Pipeline kończy się sukcesem lub bezpiecznie przerywa w przypadku błędów
 
@@ -134,6 +137,6 @@ def main():
 
 ---
 
-**Status**: 🟡 In Planning  
+**Status**: 🟢 Partially Implemented (orchestration script ready, full automation pending)  
 **Last Updated**: 2025-12-30  
 **Priority**: High
