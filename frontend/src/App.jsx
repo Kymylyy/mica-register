@@ -246,8 +246,8 @@ function App() {
             
                       {/* Right: Feedback + Contact utility panel */}
                       <div className="flex flex-col items-start md:items-end gap-1 lg:mt-[3px]">
-                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500/60">
-                          FEEDBACK / ISSUES
+                        <p className="text-sm uppercase tracking-[0.16em] text-slate-500/80 font-medium">
+                          GET CASP LICENSE
                         </p>
                         <div className="flex flex-wrap items-center gap-2">
                           <ContactPill
