@@ -240,7 +240,7 @@ function App() {
                   >
                     available here
                   </a>
-                  {' '}• Last updated: 06 January 2026
+                  {' '}• Last updated: 15 January 2026
                 </p>
               </div>
             
