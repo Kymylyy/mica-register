@@ -131,6 +131,63 @@ def check_validation_errors(validation_report_path: Path) -> Tuple[int, int]:
         return 0, 0
 
 
+def update_frontend_date(esma_date: datetime) -> bool:
+    """Update the 'Last updated' date in frontend/src/App.jsx.
+    
+    Args:
+        esma_date: The ESMA update date to use
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    import re
+    
+    app_jsx_path = Path(__file__).parent.parent / "frontend" / "src" / "App.jsx"
+    
+    if not app_jsx_path.exists():
+        print(f"Warning: Frontend file not found at {app_jsx_path}")
+        return False
+    
+    try:
+        # Read the file
+        with open(app_jsx_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Format date as "DD Month YYYY" (e.g., "15 January 2026")
+        new_date_str = esma_date.strftime("%d %B %Y")
+        
+        # Pattern to match: Last updated: DD Month YYYY
+        # Matches various formats like:
+        #   {' '}• Last updated: 15 January 2026
+        #   • Last updated: 15 January 2026
+        pattern = r"(Last updated:\s+)(\d{1,2}\s+\w+\s+\d{4})"
+        
+        # Check if pattern exists
+        if not re.search(pattern, content):
+            print(f"Warning: Could not find 'Last updated:' pattern in {app_jsx_path}")
+            return False
+        
+        # Replace the date using a lambda function to properly handle the replacement
+        def replace_date(match):
+            return match.group(1) + new_date_str
+        
+        new_content = re.sub(pattern, replace_date, content)
+        
+        # Only write if content changed
+        if new_content != content:
+            with open(app_jsx_path, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            print(f"✓ Updated frontend date to: {new_date_str}")
+            return True
+        else:
+            print(f"Frontend date already set to: {new_date_str}")
+            return True
+            
+    except Exception as e:
+        print(f"Error updating frontend date: {e}")
+        return False
+
+
 def main():
     """Main orchestration function."""
     print("=" * 60)
@@ -138,7 +195,7 @@ def main():
     print("=" * 60)
     
     # Step 1: Check for updates
-    print("\n[1/7] Checking for ESMA updates...")
+    print("\n[1/8] Checking for ESMA updates...")
     csv_date, csv_file = get_latest_csv_date(quiet=True)
     if not csv_date:
         print("Warning: No existing CSV files found. Will proceed with download.")
@@ -172,7 +229,7 @@ def main():
     raw_path = Path(__file__).parent.parent / "data" / "raw" / raw_filename
     
     # Step 2: Download CSV
-    print(f"\n[2/7] Downloading CSV file...")
+    print(f"\n[2/8] Downloading CSV file...")
     csv_url = "https://www.esma.europa.eu/sites/default/files/2024-12/CASPS.csv"
     
     if raw_path.exists():
@@ -190,7 +247,7 @@ def main():
             sys.exit(3)
     
     # Step 3: Validate raw file
-    print(f"\n[3/7] Validating raw CSV file...")
+    print(f"\n[3/8] Validating raw CSV file...")
     success, output = run_script(
         "validate_csv.py",
         [str(raw_path)],
@@ -204,7 +261,7 @@ def main():
     validation_raw_report = Path(__file__).parent.parent / "reports" / "validation" / "raw" / f"validation_{raw_path.stem}.json"
     
     # Step 4: Clean CSV
-    print(f"\n[4/7] Cleaning CSV file...")
+    print(f"\n[4/8] Cleaning CSV file...")
     cleaned_filename = f"CASP{date_str}_clean.csv"
     cleaned_path = Path(__file__).parent.parent / "data" / "cleaned" / cleaned_filename
     
@@ -226,7 +283,7 @@ def main():
     print(f"✓ Cleaned file saved to: {cleaned_path}")
     
     # Step 5: Validate cleaned file
-    print(f"\n[5/7] Validating cleaned CSV file...")
+    print(f"\n[5/8] Validating cleaned CSV file...")
     success, output = run_script(
         "validate_csv.py",
         [str(cleaned_path)],
@@ -242,7 +299,7 @@ def main():
     # Step 6: LLM Remediation (if errors exist)
     final_csv_path = cleaned_path
     if error_count > 0:
-        print(f"\n[6/7] Running LLM remediation ({error_count} errors found)...")
+        print(f"\n[6/8] Running LLM remediation ({error_count} errors found)...")
         
         # Check for API key
         api_key = os.getenv("GEMINI_API_KEY")
@@ -316,10 +373,14 @@ def main():
                     else:
                         print("Warning: No patch file found. Using cleaned file.")
     else:
-        print(f"\n[6/7] Skipping LLM remediation (no errors found)")
+        print(f"\n[6/8] Skipping LLM remediation (no errors found)")
     
-    # Step 7: Summary
-    print(f"\n[7/7] Summary")
+    # Step 7: Update frontend date
+    print(f"\n[7/8] Updating frontend date...")
+    update_frontend_date(esma_date)
+    
+    # Step 8: Summary
+    print(f"\n[8/8] Summary")
     print("=" * 60)
     print("✓ Update pipeline completed successfully!")
     print()
@@ -330,7 +391,7 @@ def main():
     print("Next steps:")
     print("  1. Review the cleaned file if needed")
     print("  2. Commit the files to git:")
-    print(f"     git add {raw_path} {final_csv_path}")
+    print(f"     git add {raw_path} {final_csv_path} frontend/src/App.jsx")
     # Format date separately to avoid f-string backslash issue
     date_formatted = esma_date.strftime("%d %B %Y")
     print(f"     git commit -m 'Update ESMA data to {date_formatted}'")
