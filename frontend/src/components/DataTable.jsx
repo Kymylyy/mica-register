@@ -21,24 +21,66 @@ const ServiceTag = ({ serviceCode, fullDescription, shortName }) => (
   </span>
 );
 
-export function DataTable({ data, onRowClick, count }) {
+export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
   const [sorting, setSorting] = useState([]);
-  
-  // Default column visibility
-  const defaultColumnVisibility = {
-    commercial_name: true,
-    home_member_state: true,
-    authorisation_notification_date: true,
-    services: true,
-    // Hidden by default
-    lei: false,
-    lei_name: false,
-    address: false,
-    website: false,
-    competent_authority: false,
-    passport_countries: false,
+
+  // Default column visibility (register-specific)
+  const getDefaultColumnVisibility = (regType) => {
+    const common = {
+      commercial_name: true,
+      home_member_state: true,
+      authorisation_notification_date: true,
+      // Hidden by default
+      lei: false,
+      lei_name: false,
+      address: false,
+      website: false,
+      competent_authority: false,
+    };
+
+    if (regType === 'casp') {
+      return {
+        ...common,
+        services: true,
+        passport_countries: false,
+      };
+    } else if (regType === 'other') {
+      return {
+        ...common,
+        white_paper_url: true,
+        lei_casp: true,
+        offer_countries: false,
+      };
+    } else if (regType === 'art') {
+      return {
+        ...common,
+        credit_institution: true,
+        white_paper_url: true,
+        white_paper_offer_countries: false,
+      };
+    } else if (regType === 'emt') {
+      return {
+        ...common,
+        exemption_48_4: true,
+        exemption_48_5: true,
+        authorisation_other_emt: true,
+        white_paper_url: false,
+      };
+    } else if (regType === 'ncasp') {
+      return {
+        ...common,
+        commercial_name: true,
+        websites: true,
+        infringement: true,
+        reason: false,
+        decision_date: true,
+      };
+    }
+
+    return common;
   };
-  
+
+  const defaultColumnVisibility = useMemo(() => getDefaultColumnVisibility(registerType), [registerType]);
   const [columnVisibility, setColumnVisibility] = useState(defaultColumnVisibility);
   const detailsRef = useRef(null);
   
@@ -53,7 +95,12 @@ export function DataTable({ data, onRowClick, count }) {
   const resetToDefault = () => {
     setColumnVisibility(defaultColumnVisibility);
   };
-  
+
+  // Reset column visibility when register type changes
+  useEffect(() => {
+    setColumnVisibility(defaultColumnVisibility);
+  }, [registerType, defaultColumnVisibility]);
+
   // Close details when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -224,8 +271,191 @@ export function DataTable({ data, onRowClick, count }) {
           );
         },
       }),
+      // OTHER register specific columns
+      columnHelper.accessor('white_paper_url', {
+        header: 'White Paper',
+        size: 250,
+        cell: info => {
+          const url = info.getValue();
+          if (!url) return '-';
+
+          let displayUrl = url.trim();
+          displayUrl = displayUrl.replace(/^https?:\/\//i, '');
+          displayUrl = displayUrl.replace(/^www\./i, '');
+
+          const href = url.startsWith('http://') || url.startsWith('https://')
+            ? url
+            : `https://${url}`;
+
+          return (
+            <div className="max-w-[250px] min-w-0">
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline break-words text-sm block"
+                title={url}
+              >
+                {displayUrl}
+              </a>
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor('lei_casp', {
+        header: 'Linked CASP',
+        size: 200,
+        cell: info => {
+          const row = info.row.original;
+          const leiCasp = info.getValue();
+          const leiNameCasp = row.lei_name_casp;
+
+          if (!leiCasp && !leiNameCasp) return '-';
+
+          return (
+            <div className="text-sm">
+              {leiNameCasp && <div className="font-medium">{leiNameCasp}</div>}
+              {leiCasp && <div className="text-xs text-gray-500">{leiCasp}</div>}
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor('offer_countries', {
+        header: 'Offer Countries',
+        size: 200,
+        cell: info => {
+          const countries = info.getValue();
+          if (!countries) return '-';
+
+          const countryList = countries.split('|').map(c => c.trim()).filter(c => c);
+          if (countryList.length === 0) return '-';
+
+          return (
+            <div className="flex flex-wrap gap-1">
+              {countryList.map((code, idx) => (
+                <span key={idx} className="flex items-center gap-1">
+                  <FlagIcon countryCode={code} />
+                  <span className="text-xs">{code}</span>
+                </span>
+              ))}
+            </div>
+          );
+        },
+      }),
+      // ART register specific columns
+      columnHelper.accessor('credit_institution', {
+        header: 'Credit Institution',
+        size: 150,
+        cell: info => {
+          const value = info.getValue();
+          if (value === null || value === undefined) return '-';
+          return value ? 'Yes' : 'No';
+        },
+      }),
+      columnHelper.accessor('white_paper_offer_countries', {
+        header: 'WP Offer Countries',
+        size: 200,
+        cell: info => {
+          const countries = info.getValue();
+          if (!countries) return '-';
+
+          const countryList = countries.split('|').map(c => c.trim()).filter(c => c);
+          if (countryList.length === 0) return '-';
+
+          return (
+            <div className="flex flex-wrap gap-1">
+              {countryList.map((code, idx) => (
+                <span key={idx} className="flex items-center gap-1">
+                  <FlagIcon countryCode={code} />
+                  <span className="text-xs">{code}</span>
+                </span>
+              ))}
+            </div>
+          );
+        },
+      }),
+      // EMT register specific columns
+      columnHelper.accessor('exemption_48_4', {
+        header: 'Exemption 48.4',
+        size: 130,
+        cell: info => {
+          const value = info.getValue();
+          if (value === null || value === undefined) return '-';
+          return value ? 'Yes' : 'No';
+        },
+      }),
+      columnHelper.accessor('exemption_48_5', {
+        header: 'Exemption 48.5',
+        size: 130,
+        cell: info => {
+          const value = info.getValue();
+          if (value === null || value === undefined) return '-';
+          return value ? 'Yes' : 'No';
+        },
+      }),
+      columnHelper.accessor('authorisation_other_emt', {
+        header: 'Institution Type',
+        size: 200,
+        cell: info => info.getValue() || '-',
+      }),
+      // NCASP register specific columns
+      columnHelper.accessor('websites', {
+        header: 'Websites',
+        size: 250,
+        cell: info => {
+          const websites = info.getValue();
+          if (!websites) return '-';
+
+          const websiteList = websites.split('|').map(w => w.trim()).filter(w => w);
+          if (websiteList.length === 0) return '-';
+
+          return (
+            <div className="flex flex-col gap-1">
+              {websiteList.map((url, idx) => {
+                let displayUrl = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+                const href = url.startsWith('http') ? url : `https://${url}`;
+
+                return (
+                  <a
+                    key={idx}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline break-words text-xs"
+                    title={url}
+                  >
+                    {displayUrl}
+                  </a>
+                );
+              })}
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor('infringement', {
+        header: 'Infringement',
+        size: 120,
+        cell: info => info.getValue() || '-',
+      }),
+      columnHelper.accessor('reason', {
+        header: 'Reason',
+        size: 300,
+        cell: info => {
+          const reason = info.getValue();
+          if (!reason || reason === 'None') return '-';
+          return <span className="text-xs">{reason}</span>;
+        },
+      }),
+      columnHelper.accessor('decision_date', {
+        header: 'Decision Date',
+        size: 130,
+        cell: info => {
+          const date = info.getValue();
+          return date ? new Date(date).toLocaleDateString() : '-';
+        },
+      }),
     ],
-    []
+    [registerType]
   );
 
   const table = useReactTable({
