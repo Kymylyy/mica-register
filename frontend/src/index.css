@@ -1,9 +1,9 @@
+/* Import flag-icons CSS for country flags - must be first */
+@import 'flag-icons/css/flag-icons.min.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import flag-icons CSS for country flags */
-@import 'flag-icons/css/flag-icons.min.css';
 
 :root {
   /* ============================================
