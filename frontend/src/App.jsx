@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Analytics } from '@vercel/analytics/react';
+import axios from 'axios';
 import api from './utils/api';
 import { DataTable } from './components/DataTable';
 import { Filters } from './components/Filters';
+import { RegisterSelector } from './components/RegisterSelector';
 import { FlagIcon } from './components/FlagIcon';
 import { formatDate, copyToClipboard } from './utils/modalUtils';
 import { getServiceDescription, getServiceShortName, getServiceDescriptionCapitalized, getServiceCodeOrder, getServiceMediumName } from './utils/serviceDescriptions';
+import { useDebounce } from './utils/debounce';
 
 // Country code to full English name mapping
 const COUNTRY_NAMES = {
@@ -42,7 +45,7 @@ const COUNTRY_NAMES = {
   'EL': 'Greece',
 };
 
-function App() {
+function App({ registerType = 'casp' }) {
   const [entities, setEntities] = useState([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -54,7 +57,10 @@ function App() {
   const isInitialMount = useRef(true);
   const abortControllerRef = useRef(null);
 
-  const fetchEntities = useCallback(async (showLoading = true) => {
+  // Debounce search input (300ms) for better performance
+  const debouncedSearch = useDebounce(filters.search, 300);
+
+  const fetchEntities = useCallback(async (showLoading = true, searchValue = debouncedSearch) => {
     // Cancel any previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -69,7 +75,12 @@ function App() {
     }
     try {
       const params = new URLSearchParams();
-      if (filters.search) params.append('search', filters.search);
+
+      // Add register type
+      params.append('register_type', registerType);
+
+      // Use debounced search value instead of direct filters.search
+      if (searchValue) params.append('search', searchValue);
       if (filters.home_member_states && filters.home_member_states.length > 0) {
         filters.home_member_states.forEach(state => {
           params.append('home_member_states', state);
@@ -83,6 +94,7 @@ function App() {
       if (filters.auth_date_from) params.append('auth_date_from', filters.auth_date_from);
       if (filters.auth_date_to) params.append('auth_date_to', filters.auth_date_to);
 
+      // Batch parallel API requests for better performance
       const [entitiesRes, countRes] = await Promise.all([
         api.get(`/api/entities?${params.toString()}&limit=1000`, {
           signal: abortController.signal
@@ -100,8 +112,8 @@ function App() {
     } catch (error) {
       // Ignore errors from cancelled requests
       if (
-        error.name === 'CanceledError' || 
-        error.name === 'AbortError' || 
+        error.name === 'CanceledError' ||
+        error.name === 'AbortError' ||
         error.code === 'ERR_CANCELED' ||
         error.message === 'canceled' ||
         axios.isCancel(error) ||
@@ -116,7 +128,7 @@ function App() {
         setLoading(false);
       }
     }
-  }, [filters]);
+  }, [filters, debouncedSearch, registerType]);
 
   // Cleanup abort controller on unmount
   useEffect(() => {
@@ -136,16 +148,27 @@ function App() {
     }
   }, []);
 
-  // Effect for all filters - triggers immediately but cancels previous requests
+  // Effect for register type change - reset filters
   useEffect(() => {
     // Skip on initial mount
     if (isInitialMount.current) return;
 
-    // Fetch immediately - AbortController will cancel any previous request
-    // Show loading only for search changes to provide feedback during typing
-    const showLoading = filters.search !== undefined;
-    fetchEntities(showLoading);
-  }, [filters.search, filters.home_member_states, filters.service_codes, filters.auth_date_from, filters.auth_date_to, fetchEntities]);
+    // Reset filters when register type changes
+    // The filters effect below will handle fetching with new registerType
+    setFilters({});
+    setSelectedEntity(null);
+  }, [registerType]);
+
+  // Effect for all filters - uses debounced search for better performance
+  // Also triggers on registerType change (via fetchEntities dependency)
+  useEffect(() => {
+    // Skip on initial mount
+    if (isInitialMount.current) return;
+
+    // Fetch with debounced search - AbortController will cancel any previous request
+    // Show loading for better UX
+    fetchEntities(true);
+  }, [debouncedSearch, filters.home_member_states, filters.service_codes, filters.auth_date_from, filters.auth_date_to, fetchEntities]);
 
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
@@ -278,7 +301,11 @@ function App() {
         </header>
 
         <div className="max-w-7xl mx-auto px-3 lg:px-6">
+          {/* Register type selector tabs */}
+          <RegisterSelector />
+
           <Filters
+          registerType={registerType}
           filters={filters}
           onFiltersChange={handleFiltersChange}
           onClearFilters={handleClearFilters}
@@ -296,7 +323,7 @@ function App() {
           )}
           {entities.length > 0 && (
             <div className="transition-opacity duration-300 ease-in-out">
-              <DataTable data={entities} onRowClick={handleRowClick} count={count} />
+              <DataTable data={entities} onRowClick={handleRowClick} count={count} registerType={registerType} />
               {loading && (
                 <div className="absolute top-0 right-0 mt-2 mr-4 z-10">
                   <div className="bg-white rounded-lg shadow-md px-3 py-2 flex items-center gap-2 text-sm text-gray-600 border border-gray-200">
@@ -498,37 +525,297 @@ function App() {
                     </dl>
                   </div>
 
-                  {/* Right column: Services */}
+                  {/* Right column: Register-specific details */}
                   <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <svg className="h-4 w-4 text-textSoft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                      </svg>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-textSoft">
-                        Services
-                      </h3>
-                    </div>
-                    {selectedEntity.services && selectedEntity.services.length > 0 ? (
-                      <div className="space-y-2 text-sm text-textMain">
-                        {[...selectedEntity.services]
-                          .sort((a, b) => getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code))
-                          .map((service, idx) => {
-                            const mediumName = getServiceMediumName(service.code);
-                            return (
-                              <div key={idx} className="pb-2 border-b border-borderSubtle last:border-0 last:pb-0">
-                                {mediumName}
+                    {/* CASP: Services */}
+                    {registerType === 'casp' && (
+                      <>
+                        <div className="flex items-center gap-2 mb-3">
+                          <svg className="h-4 w-4 text-textSoft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                          </svg>
+                          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-textSoft">
+                            Services
+                          </h3>
+                        </div>
+                        {selectedEntity.services && selectedEntity.services.length > 0 ? (
+                          <div className="space-y-2 text-sm text-textMain">
+                            {[...selectedEntity.services]
+                              .sort((a, b) => getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code))
+                              .map((service, idx) => {
+                                const mediumName = getServiceMediumName(service.code);
+                                return (
+                                  <div key={idx} className="pb-2 border-b border-borderSubtle last:border-0 last:pb-0">
+                                    {mediumName}
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        ) : (
+                          <p className="text-textMuted text-sm font-medium">-</p>
+                        )}
+                      </>
+                    )}
+
+                    {/* OTHER: White Paper & Linked CASP */}
+                    {registerType === 'other' && (
+                      <dl className="space-y-3">
+                        {/* White Paper URL */}
+                        <div>
+                          <dt className="text-xs font-medium text-textSoft mb-0.5">White Paper</dt>
+                          <dd className="text-sm text-textMain">
+                            {selectedEntity.white_paper_url ? (
+                              <a
+                                href={selectedEntity.white_paper_url.startsWith('http') ? selectedEntity.white_paper_url : `https://${selectedEntity.white_paper_url}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline break-words"
+                              >
+                                {selectedEntity.white_paper_url}
+                              </a>
+                            ) : '-'}
+                          </dd>
+                        </div>
+
+                        {/* Linked CASP */}
+                        {(selectedEntity.lei_casp || selectedEntity.lei_name_casp) && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">Linked CASP</dt>
+                            <dd className="text-sm text-textMain">
+                              {selectedEntity.lei_name_casp && (
+                                <div className="font-medium">{selectedEntity.lei_name_casp}</div>
+                              )}
+                              {selectedEntity.lei_casp && (
+                                <div className="text-xs text-gray-500">{selectedEntity.lei_casp}</div>
+                              )}
+                            </dd>
+                          </div>
+                        )}
+
+                        {/* Offer Countries */}
+                        {selectedEntity.offer_countries && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">Offer Countries</dt>
+                            <dd className="text-sm text-textMain">
+                              <div className="flex flex-wrap gap-1">
+                                {selectedEntity.offer_countries.split('|').map((code, idx) => (
+                                  <span key={idx} className="inline-flex items-center gap-1 rounded-md bg-surfaceAlt border border-borderSubtle px-2 py-[2px] text-xs text-textMuted">
+                                    <FlagIcon countryCode={code.trim()} size="xs" />
+                                    <span>{code.trim()}</span>
+                                  </span>
+                                ))}
                               </div>
-                            );
-                          })}
-                      </div>
-                    ) : (
-                      <p className="text-textMuted text-sm font-medium">-</p>
+                            </dd>
+                          </div>
+                        )}
+
+                        {/* DTI Codes */}
+                        {selectedEntity.dti_codes && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">DTI Codes</dt>
+                            <dd className="text-sm text-textMain">{selectedEntity.dti_codes}</dd>
+                          </div>
+                        )}
+
+                        {/* DTI FFG */}
+                        {selectedEntity.dti_ffg !== null && selectedEntity.dti_ffg !== undefined && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">DTI FFG</dt>
+                            <dd className="text-sm text-textMain">{selectedEntity.dti_ffg ? 'Yes' : 'No'}</dd>
+                          </div>
+                        )}
+
+                        {/* White Paper Comments */}
+                        {selectedEntity.white_paper_comments && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">White Paper Comments</dt>
+                            <dd className="text-sm text-textMain whitespace-pre-wrap">{selectedEntity.white_paper_comments}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    )}
+
+                    {/* ART: Asset-Referenced Tokens */}
+                    {registerType === 'art' && (
+                      <dl className="space-y-3">
+                        {/* Credit Institution */}
+                        <div>
+                          <dt className="text-xs font-medium text-textSoft mb-0.5">Credit Institution</dt>
+                          <dd className="text-sm text-textMain">
+                            {selectedEntity.credit_institution !== null && selectedEntity.credit_institution !== undefined
+                              ? (selectedEntity.credit_institution ? 'Yes' : 'No')
+                              : '-'}
+                          </dd>
+                        </div>
+
+                        {/* White Paper URL */}
+                        {selectedEntity.white_paper_url && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">White Paper</dt>
+                            <dd className="text-sm text-textMain">
+                              <a
+                                href={selectedEntity.white_paper_url.startsWith('http') ? selectedEntity.white_paper_url : `https://${selectedEntity.white_paper_url}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline break-words"
+                              >
+                                {selectedEntity.white_paper_url}
+                              </a>
+                            </dd>
+                          </div>
+                        )}
+
+                        {/* White Paper Offer Countries */}
+                        {selectedEntity.white_paper_offer_countries && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">WP Offer Countries</dt>
+                            <dd className="text-sm text-textMain">
+                              <div className="flex flex-wrap gap-1">
+                                {selectedEntity.white_paper_offer_countries.split('|').map((code, idx) => (
+                                  <span key={idx} className="inline-flex items-center gap-1 rounded-md bg-surfaceAlt border border-borderSubtle px-2 py-[2px] text-xs text-textMuted">
+                                    <FlagIcon countryCode={code.trim()} size="xs" />
+                                    <span>{code.trim()}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </dd>
+                          </div>
+                        )}
+
+                        {/* White Paper Comments */}
+                        {selectedEntity.white_paper_comments && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">White Paper Comments</dt>
+                            <dd className="text-sm text-textMain whitespace-pre-wrap">{selectedEntity.white_paper_comments}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    )}
+
+                    {/* EMT: E-Money Tokens */}
+                    {registerType === 'emt' && (
+                      <dl className="space-y-3">
+                        {/* Exemptions */}
+                        <div>
+                          <dt className="text-xs font-medium text-textSoft mb-0.5">Exemption 48.4</dt>
+                          <dd className="text-sm text-textMain">
+                            {selectedEntity.exemption_48_4 !== null && selectedEntity.exemption_48_4 !== undefined
+                              ? (selectedEntity.exemption_48_4 ? 'Yes' : 'No')
+                              : '-'}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="text-xs font-medium text-textSoft mb-0.5">Exemption 48.5</dt>
+                          <dd className="text-sm text-textMain">
+                            {selectedEntity.exemption_48_5 !== null && selectedEntity.exemption_48_5 !== undefined
+                              ? (selectedEntity.exemption_48_5 ? 'Yes' : 'No')
+                              : '-'}
+                          </dd>
+                        </div>
+
+                        {/* Institution Type */}
+                        <div>
+                          <dt className="text-xs font-medium text-textSoft mb-0.5">Institution Type</dt>
+                          <dd className="text-sm text-textMain">{selectedEntity.authorisation_other_emt || '-'}</dd>
+                        </div>
+
+                        {/* White Paper URL */}
+                        {selectedEntity.white_paper_url && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">White Paper</dt>
+                            <dd className="text-sm text-textMain">
+                              <a
+                                href={selectedEntity.white_paper_url.startsWith('http') ? selectedEntity.white_paper_url : `https://${selectedEntity.white_paper_url}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline break-words"
+                              >
+                                {selectedEntity.white_paper_url}
+                              </a>
+                            </dd>
+                          </div>
+                        )}
+
+                        {/* DTI Codes */}
+                        {selectedEntity.dti_codes && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">DTI Codes</dt>
+                            <dd className="text-sm text-textMain">{selectedEntity.dti_codes}</dd>
+                          </div>
+                        )}
+
+                        {/* DTI FFG */}
+                        {selectedEntity.dti_ffg !== null && selectedEntity.dti_ffg !== undefined && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">DTI FFG</dt>
+                            <dd className="text-sm text-textMain">{selectedEntity.dti_ffg ? 'Yes' : 'No'}</dd>
+                          </div>
+                        )}
+
+                        {/* White Paper Comments */}
+                        {selectedEntity.white_paper_comments && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">White Paper Comments</dt>
+                            <dd className="text-sm text-textMain whitespace-pre-wrap">{selectedEntity.white_paper_comments}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    )}
+
+                    {/* NCASP: Non-Compliant Entities */}
+                    {registerType === 'ncasp' && (
+                      <dl className="space-y-3">
+                        {/* Multiple Websites */}
+                        {selectedEntity.websites && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">Websites</dt>
+                            <dd className="text-sm text-textMain">
+                              <div className="flex flex-col gap-1">
+                                {selectedEntity.websites.split('|').map((url, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={url.trim().startsWith('http') ? url.trim() : `https://${url.trim()}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline break-words"
+                                  >
+                                    {url.trim()}
+                                  </a>
+                                ))}
+                              </div>
+                            </dd>
+                          </div>
+                        )}
+
+                        {/* Infringement */}
+                        <div>
+                          <dt className="text-xs font-medium text-textSoft mb-0.5">Infringement</dt>
+                          <dd className="text-sm text-textMain">{selectedEntity.infringement || '-'}</dd>
+                        </div>
+
+                        {/* Reason */}
+                        {selectedEntity.reason && selectedEntity.reason !== 'None' && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">Reason</dt>
+                            <dd className="text-sm text-textMain whitespace-pre-wrap">{selectedEntity.reason}</dd>
+                          </div>
+                        )}
+
+                        {/* Decision Date */}
+                        {selectedEntity.decision_date && (
+                          <div>
+                            <dt className="text-xs font-medium text-textSoft mb-0.5">Decision Date</dt>
+                            <dd className="text-sm text-textMain">{formatDate(selectedEntity.decision_date)}</dd>
+                          </div>
+                        )}
+                      </dl>
                     )}
                   </div>
                 </div>
 
-                {/* Passport Countries - separate block at bottom */}
-                {selectedEntity.passport_countries && selectedEntity.passport_countries.length > 0 && (
+                {/* Passport Countries - separate block at bottom (CASP only) */}
+                {registerType === 'casp' && selectedEntity.passport_countries && selectedEntity.passport_countries.length > 0 && (
                   <div className="mt-6">
                     <div className="h-px bg-borderSubtle mb-4" />
                     <div className="flex items-center gap-2 mb-2">

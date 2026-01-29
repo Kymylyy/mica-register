@@ -1,362 +1,432 @@
 # Instrukcja aktualizacji danych z ESMA
 
-Ten dokument opisuje krok po kroku, jak zaktualizować dane na stronie WWW, gdy ESMA opublikuje nowy plik CSV z rejestrem CASP.
+Ten dokument opisuje krok po kroku, jak zaktualizować dane wszystkich 5 rejestrów MiCA z ESMA.
+
+## 📋 Rejestry MiCA
+
+Aplikacja obsługuje wszystkie 5 rejestrów ESMA MiCA:
+
+1. **CASP** - Crypto-Asset Service Providers (Dostawcy usług krypto-aktywów)
+2. **OTHER** - White Papers for other crypto-assets (Białe księgi dla innych krypto-aktywów)
+3. **ART** - Asset-Referenced Token Issuers (Emitenci tokenów referencyjnych aktywów)
+4. **EMT** - E-Money Token Issuers (Emitenci tokenów pieniądza elektronicznego)
+5. **NCASP** - Non-Compliant Entities (Podmioty niezgodne z przepisami)
 
 ## 📋 Wymagania
 
 - Dostęp do repozytorium GitHub
-- Dostęp do Railway dashboard (backend)
-- Dostęp do Vercel dashboard (frontend) - opcjonalnie, jeśli chcesz sprawdzić deployment
-- Python 3.11+ (do uruchomienia skryptów walidacji i czyszczenia)
+- Dostęp do Railway dashboard (backend) - opcjonalnie, dla produkcji
+- Dostęp do Vercel dashboard (frontend) - opcjonalnie, dla produkcji
+- Python 3.11+ (do uruchomienia skryptów aktualizacji i importu)
 
 ## 📁 Struktura katalogów
 
-Projekt używa następującej struktury dla plików CSV i raportów:
+Projekt używa następującej struktury dla plików CSV (per rejestr):
 
 ```
 data/
-├── raw/              # Surowe pliki CSV pobrane z ESMA
-│   └── CASP20251215.csv
-└── cleaned/          # Oczyszczone pliki CSV gotowe do importu
-    ├── CASP20251215_clean.csv
-    └── CASP20251215_clean_llm.csv  # Po LLM remediation (opcjonalnie)
-
-reports/
-├── validation/       # Raporty walidacji
-│   ├── raw/         # Raporty dla surowych plików
-│   ├── clean/       # Raporty dla wyczyszczonych plików
-│   └── final/       # Raporty dla finalnych plików (po LLM)
-├── cleaning/        # Raporty z operacji czyszczenia
-└── remediation/     # Pliki LLM remediation
-    ├── tasks/       # Wygenerowane zadania remediacji
-    ├── patches/     # Patch'e wygenerowane przez LLM
-    └── apply/       # Raporty zastosowania patch'y
+├── raw/                    # Surowe pliki CSV pobrane z ESMA
+│   ├── casp/
+│   │   └── CASP20260129.csv
+│   ├── other/
+│   │   └── OTHER20260129.csv
+│   ├── art/
+│   │   └── ART20260129.csv
+│   ├── emt/
+│   │   └── EMT20260129.csv
+│   └── ncasp/
+│       └── NCASP20260129.csv
+└── cleaned/                # Oczyszczone pliki CSV (przyszłe wersje)
+    ├── casp/
+    ├── other/
+    ├── art/
+    ├── emt/
+    └── ncasp/
 ```
 
-**Ważne:** 
-- Endpoint importu automatycznie znajduje najnowszy plik `*_clean.csv` (lub `*_clean_llm.csv` jeśli użyto LLM) w katalogu `data/cleaned/`
-- Wszystkie raporty są automatycznie zapisywane w odpowiednich podkatalogach `reports/`
-- Pliki w `reports/` są ignorowane przez git (zobacz `.gitignore`)
+**Ważne:**
+- Każdy rejestr ma swój własny katalog w `data/raw/`
+- Nazwy plików muszą zawierać prefiks rejestru: `CASP`, `OTHER`, `ART`, `EMT`, `NCASP`
+- Format daty w nazwie pliku: `yyyymmdd` (np. `CASP20260129.csv`)
 
 ## 🔄 Proces aktualizacji
 
 ### Metoda A: Automatyczny skrypt orchestracji (Zalecane)
 
-Najprostszy sposób - użyj skryptu, który automatycznie sprawdzi ESMA, pobierze plik i przeprowadzi cały pipeline:
+Najprostszy sposób - użyj skryptu, który automatycznie sprawdzi ESMA, pobierze pliki i zaktualizuje frontend:
 
 ```bash
-python scripts/update_esma_data.py
+# Aktualizuj wszystkie rejestry
+python scripts/update_esma_data.py --all
+
+# Aktualizuj konkretny rejestr
+python scripts/update_esma_data.py --register casp
+python scripts/update_esma_data.py --register other
+python scripts/update_esma_data.py --register art
+python scripts/update_esma_data.py --register emt
+python scripts/update_esma_data.py --register ncasp
+
+# Wymuś ponowne pobranie nawet jeśli plik istnieje
+python scripts/update_esma_data.py --all --force
 ```
 
 Skrypt automatycznie:
-1. Sprawdzi czy ESMA zaktualizowała rejestr (porówna daty)
-2. Pobierze najnowszy plik CSV z ESMA
-3. Zwaliduje surowy plik
-4. Wyczyści plik automatycznie
-5. Zwaliduje wyczyszczony plik
-6. (Opcjonalnie) Uruchomi LLM remediation jeśli są błędy
-7. Przygotuje pliki gotowe do importu
+1. Sprawdzi czy ESMA zaktualizowała rejestr(y) (porówna daty)
+2. Pobierze najnowsze pliki CSV z ESMA
+3. Zapisze pliki do odpowiednich katalogów `data/raw/{register}/`
+4. Zaktualizuje datę "Last updated" w frontendzie
 
-**Po zakończeniu skryptu musisz ręcznie:**
-- Zrobić commit i push do GitHub
-- Poczekać na deployment Railway
-- Wywołać endpoint importu: `./update_production.sh <YOUR_RAILWAY_URL>`
+**Po zakończeniu skryptu:**
+
+1. **Importuj dane do bazy:**
+   ```bash
+   # Importuj wszystkie rejestry
+   python backend/app/import_csv.py --all
+
+   # Lub importuj konkretny rejestr
+   python backend/app/import_csv.py --register casp
+   python backend/app/import_csv.py --register other
+   python backend/app/import_csv.py --register art
+   python backend/app/import_csv.py --register emt
+   python backend/app/import_csv.py --register ncasp
+   ```
+
+2. **Commit i push (opcjonalnie):**
+   ```bash
+   git add data/raw/ frontend/src/App.jsx
+   git commit -m "Update ESMA data to 29 January 2026"
+   git push
+   ```
 
 **Wymagania:**
 - Python 3.11+
 - Zainstalowane zależności: `pip install -r backend/requirements.txt`
-- Playwright browsers: `python3 -m playwright install chromium`
-- (Opcjonalnie) `GEMINI_API_KEY` w zmiennych środowiskowych dla LLM remediation
+- Playwright browsers: `python3 -m playwright install chromium` (do sprawdzania strony ESMA)
 
 ### Metoda B: Ręczny proces krok po kroku
 
 Jeśli wolisz pełną kontrolę nad każdym krokiem:
 
-### Krok 1: Pobierz nowy plik CSV z ESMA
+### Krok 1: Pobierz nowe pliki CSV z ESMA
 
-1. Pobierz najnowszy plik CSV z [ESMA Register](https://www.esma.europa.eu/press-news/esma-news/esma-publishes-first-list-crypto-asset-service-providers-casps-authorised-under-mica)
-2. Zapisz plik w katalogu `data/raw/` z nazwą zawierającą datę: `CASP20251215.csv` (format: `CASPYYYYMMDD.csv`)
+Pobierz najnowsze pliki CSV dla wybranych rejestrów:
+
+**URL-e do pobrania:**
+- **CASP:** https://www.esma.europa.eu/sites/default/files/2024-12/CASPS.csv
+- **OTHER:** https://www.esma.europa.eu/sites/default/files/2024-12/OTHER.csv
+- **ART:** https://www.esma.europa.eu/sites/default/files/2024-12/ARTZZ.csv
+- **EMT:** https://www.esma.europa.eu/sites/default/files/2024-12/EMTWP.csv
+- **NCASP:** https://www.esma.europa.eu/sites/default/files/2024-12/NCASP.csv
+
+**Uwaga:** URL-e mogą się zmieniać w zależności od daty publikacji. Sprawdź stronę ESMA dla aktualnych linków.
+
+Zapisz pliki w odpowiednich katalogach z nazwą zawierającą datę:
 
 ```bash
-# Przykład: jeśli pobrałeś plik 15 grudnia 2025
-mv ~/Downloads/CASP_register.csv data/raw/CASP20251215.csv
+# Przykład: jeśli pobrałeś pliki 29 stycznia 2026
+mv ~/Downloads/CASPS.csv data/raw/casp/CASP20260129.csv
+mv ~/Downloads/OTHER.csv data/raw/other/OTHER20260129.csv
+mv ~/Downloads/ARTZZ.csv data/raw/art/ART20260129.csv
+mv ~/Downloads/EMTWP.csv data/raw/emt/EMT20260129.csv
+mv ~/Downloads/NCASP.csv data/raw/ncasp/NCASP20260129.csv
 ```
 
-### Krok 2: Walidacja pliku CSV (opcjonalne, ale zalecane)
-
-Sprawdź czy plik nie ma błędów przed czyszczeniem:
+### Krok 2: Importuj dane do bazy
 
 ```bash
 # Z głównego katalogu projektu
-python scripts/validate_csv.py data/raw/CASP20251215.csv
-```
 
-Skrypt pokaże:
-- Błędy (ERROR) - wymagają naprawy przed importem
-- Ostrzeżenia (WARNING) - mogą być automatycznie naprawione podczas czyszczenia
+# Importuj wszystkie rejestry
+python backend/app/import_csv.py --all
 
-Raport JSON zostanie automatycznie zapisany w `reports/validation/raw/validation_CASP20251215.json`.
-
-**Sprawdzenie liczby błędów i ostrzeżeń:**
-```bash
-# Użyj grep (wielkie litery)
-cat reports/validation/raw/validation_CASP20251215.json | python3 -m json.tool | grep -E "(Errors|Warnings)"
-
-# Lub użyj Python
-python3 -c "import json; d=json.load(open('reports/validation/raw/validation_CASP20251215.json')); print(f'Errors: {d[\"stats\"][\"errors\"]}, Warnings: {d[\"stats\"][\"warnings\"]}')"
-```
-
-**Uwaga:** Jeśli są tylko ostrzeżenia, możesz przejść do następnego kroku - skrypt czyszczący automatycznie je naprawi.
-
-### Krok 3: Oczyszczenie pliku CSV
-
-Skrypt automatycznie naprawi wszystkie wykryte problemy (encoding, daty, białe znaki, duplikaty LEI, itp.):
-
-```bash
-# Z głównego katalogu projektu
-python scripts/clean_csv.py --input data/raw/CASP20251215.csv
+# Lub importuj konkretne rejestry
+python backend/app/import_csv.py --register casp
+python backend/app/import_csv.py --register other
+# itd.
 ```
 
 Skrypt automatycznie:
-- Utworzy wyczyszczony plik `CASP20251215_clean.csv` w katalogu `data/cleaned/`
-- Zapisze raport z czyszczenia w `reports/cleaning/cleaning_CASP20251215.json`
+- Znajdzie najnowszy plik CSV w katalogu rejestru
+- Wyczyści stare dane tego rejestru z bazy
+- Zaimportuje nowe dane
+- Utworzy relacje (usługi, kraje passport dla CASP)
+- Pokaże statystyki importu
 
-**Co jest naprawiane automatycznie:**
-- Błędy encoding (np. `Stra�e` → `Straße`)
-- Błędy w datach (np. `01/12/.2025` → `01/12/2025`)
-- Białe znaki i spacje
-- Duplikaty LEI (mergowane w jeden rekord)
-- Problemy z formatem LEI
-- Wielowierszowe pola
-- Normalizacja kodów krajów i usług
-- Parsowanie adresów i stron WWW
-
-**Opcjonalnie:** Możesz podać własną ścieżkę wyjściową:
-
-```bash
-python scripts/clean_csv.py --input data/raw/CASP20251215.csv --report cleaning_report.json
+**Przykładowy output:**
+```
+Processing CASP register...
+Found CSV file: data/raw/casp/CASP20260129.csv
+Cleared 132 existing CASP entities
+Imported 135 entities
 ```
 
-### Krok 4: Zaktualizuj datę w frontendzie
+### Krok 3: Zaktualizuj datę w frontendzie
 
 1. Otwórz plik `frontend/src/App.jsx`
 2. Znajdź linię z "Last updated:"
 3. Zaktualizuj datę na datę z nowego pliku CSV
 
 ```jsx
-// Przykład dla pliku z 15 grudnia 2025:
-{' '}• Last updated: 15 December 2025
+// Przykład dla pliku z 29 stycznia 2026:
+{' '}• Last updated: 29 January 2026
 ```
 
-### Krok 5: Commit i push na GitHub
+**Uwaga:** Data "Last updated" jest wspólna dla wszystkich rejestrów. Jeśli aktualizujesz tylko jeden rejestr, użyj daty tej aktualizacji.
+
+### Krok 4: Sprawdź czy wszystko działa
+
+1. Uruchom backend:
+   ```bash
+   cd backend
+   uvicorn app.main:app --reload
+   ```
+
+2. Uruchom frontend:
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+
+3. Otwórz http://localhost:5173
+4. Przełączaj się między zakładkami rejestrów
+5. Sprawdź czy liczba entities się zgadza dla każdego rejestru
+6. Sprawdź kilka rekordów czy dane się zgadzają
+
+### Krok 5: Commit i push na GitHub (opcjonalnie)
 
 ```bash
 # Dodaj zmienione pliki
-git add data/raw/CASP20251215.csv data/cleaned/CASP20251215_clean.csv frontend/src/App.jsx
+git add data/raw/ frontend/src/App.jsx
 
 # Zrób commit
-git commit -m "Update CSV data to ESMA register from 15 December 2025"
+git commit -m "Update ESMA data to 29 January 2026"
 
 # Push na GitHub
 git push origin main
 ```
 
-**Uwaga:** Zastąp datę w nazwie pliku i commicie rzeczywistą datą.
+## 📊 Statystyki rejestrów (stan przykładowy)
 
-### Krok 6: Poczekaj na automatyczny deployment
-
-Po pushu na GitHub:
-- **Railway** automatycznie zbuduje nowy obraz Docker z nowym CSV w katalogu `data/cleaned/`
-- **Vercel** automatycznie zaktualizuje frontend
-
-Czas deploymentu: zwykle 2-5 minut.
-
-Możesz sprawdzić status:
-- Railway dashboard → Twój projekt → Deployments
-- Vercel dashboard → Twój projekt → Deployments
-
-### Krok 4: Walidacja wyczyszczonego pliku
-
-Sprawdź czy po czyszczeniu nadal są błędy:
+Po importie możesz sprawdzić liczbę encji w każdym rejestrze:
 
 ```bash
-python scripts/validate_csv.py data/cleaned/CASP20251215_clean.csv
+# W konsoli Python (w środowisku backend)
+python3 << EOF
+from app.database import SessionLocal
+from app.models import Entity
+from app.config.registers import RegisterType
+
+db = SessionLocal()
+for reg_type in RegisterType:
+    count = db.query(Entity).filter(Entity.register_type == reg_type).count()
+    print(f"{reg_type.value.upper()}: {count} entities")
+db.close()
+EOF
 ```
 
-Raport zostanie zapisany w `reports/validation/clean/validation_CASP20251215_clean.json`.
-
-**Sprawdzenie liczby pozostałych błędów:**
-```bash
-python3 -c "import json; d=json.load(open('reports/validation/clean/validation_CASP20251215_clean.json')); print(f'Errors: {d[\"stats\"][\"errors\"]}, Warnings: {d[\"stats\"][\"warnings\"]}')"
+**Przykładowy output:**
+```
+CASP: 132 entities
+OTHER: 594 entities
+ART: 0 entities
+EMT: 17 entities
+NCASP: 101 entities
+Total: 844 entities
 ```
 
-### Krok 5: (Opcjonalne) LLM Remediation dla pozostałych błędów
+## 🔧 Szczegóły techniczne
 
-Jeśli po czyszczeniu nadal są błędy, możesz użyć LLM remediation do naprawy edge cases:
+### Import CSV - jak to działa
 
-```bash
-# 1. Wygeneruj remediation tasks z validation report
-python scripts/generate_remediation_tasks.py \
-  data/cleaned/CASP20251215_clean.csv \
-  reports/validation/clean/validation_CASP20251215_clean.json \
-  --max-tasks 50
+Skrypt `backend/app/import_csv.py` dla każdego rejestru:
 
-# Zadania zostaną zapisane w reports/remediation/tasks/tasks_CASP20251215_clean.json
+1. **Znajduje najnowszy plik CSV** w katalogu `data/raw/{register}/`
+2. **Czyści stare dane** dla tego rejestru (zachowuje inne rejestry)
+3. **Parsuje CSV** z obsługą encoding issues (German characters, itp.)
+4. **Normalizuje dane**:
+   - Kody krajów (2-letter ISO)
+   - Kody usług (a-j dla CASP)
+   - Daty (DD/MM/YYYY)
+   - Pipe-separated values ("|")
+5. **Tworzy rekordy** w bazie:
+   - Base Entity record (wspólne pola)
+   - Extension record (pola specyficzne dla rejestru)
+   - Relacje (services, passport_countries dla CASP)
 
-# 2. Uruchom LLM remediation (wymaga GEMINI_API_KEY w .env)
-python scripts/run_llm_remediation.py \
-  reports/remediation/tasks/tasks_CASP20251215_clean.json
+### Architektura bazy danych
 
-# Patch zostanie zapisany w reports/remediation/patches/patch_*.json
-
-# 3. Zastosuj patch (wymaga manual approval domyślnie)
-python scripts/apply_remediation_patch.py \
-  data/cleaned/CASP20251215_clean.csv \
-  reports/remediation/patches/patch_*.json \
-  reports/remediation/tasks/tasks_CASP20251215_clean.json \
-  --out data/cleaned/CASP20251215_clean_llm.csv
-
-# Raport zostanie zapisany w reports/remediation/apply/apply_CASP20251215_clean.json
-
-# 4. Walidacja finalnego pliku (MUSI przejść)
-python scripts/validate_csv.py data/cleaned/CASP20251215_clean_llm.csv
+```
+entities (base table)
+├── register_type: casp|other|art|emt|ncasp
+├── Common fields: lei, lei_name, commercial_name, home_member_state, etc.
+└── Extension tables (1:1):
+    ├── casp_entities (services a-j, passport_countries, website_platform)
+    ├── other_entities (white_paper_url, offer_countries, dti_codes)
+    ├── art_entities (credit_institution, white_paper_notification_date)
+    ├── emt_entities (exemption_48_4, exemption_48_5, authorisation_other_emt)
+    └── ncasp_entities (websites, infringement, reason, decision_date)
 ```
 
-**Uwaga:** 
-- LLM remediation jest opcjonalne. Jeśli nie używasz, przejdź do kroku 6.
-- Wymaga ustawienia `GEMINI_API_KEY` w pliku `.env` (zobacz `.env.example`)
-- Wszystkie pliki są automatycznie zapisywane w odpowiednich katalogach `reports/`
+### Mapowanie kolumn CSV → Baza danych
 
-### Krok 6: Wywołaj import danych na Railway
+#### Wspólne pola (wszystkie rejestry):
+- `ae_competentAuthority` → `competent_authority`
+- `ae_homeMemberState` → `home_member_state`
+- `ae_lei_name` → `lei_name`
+- `ae_lei` → `lei`
+- `ae_lei_cou_code` → `lei_cou_code`
+- `ae_commercial_name` → `commercial_name`
+- `ae_address` → `address`
+- `ae_website` → `website`
+- `ac_authorisationNotificationDate` → `authorisation_notification_date`
+- `ac_lastupdate` → `last_update`
+- `ac_comments` → `comments`
 
-**To jest najważniejszy krok!** Railway ma nowy CSV w kontenerze, ale dane w bazie nie aktualizują się automatycznie.
+#### CASP-specific:
+- `ae_website_platform` → `website_platform`
+- `ac_authorisationEndDate` → `authorisation_end_date`
+- `ac_serviceCode` → `services` (pipe-separated, a-j)
+- `ac_serviceCode_cou` → `passport_countries` (pipe-separated)
 
-Endpoint `/api/admin/import` automatycznie znajdzie najnowszy plik `*_clean.csv` (lub `*_clean_llm.csv` jeśli użyto LLM) w katalogu `data/cleaned/`.
+#### OTHER-specific:
+- `wp_url` → `white_paper_url`
+- `wp_comments` → `white_paper_comments`
+- `wp_lastupdate` → `white_paper_last_update`
+- `ae_offerCode_cou` → `offer_countries` (pipe-separated)
+- `ae_DTI` → `dti_codes` (pipe-separated)
+- `ae_DTI_FFG` → `dti_ffg` (boolean)
+- `ae_lei_casp` → `lei_casp` (linked CASP LEI)
+- `ae_lei_name_casp` → `lei_name_casp`
 
-#### Opcja A: Użyj skryptu (zalecane)
+#### ART-specific:
+- `ae_credit_institution` → `credit_institution` (boolean)
+- `wp_url` → `white_paper_url`
+- `wp_authorisationNotificationDate` → `white_paper_notification_date`
+- `wp_url_cou` → `white_paper_offer_countries` (pipe-separated)
+- `wp_comments` → `white_paper_comments`
+- `wp_lastupdate` → `white_paper_last_update`
 
-```bash
-./update_production.sh https://mica-register-production.up.railway.app
-```
+#### EMT-specific:
+- `ae_exemption48_4` → `exemption_48_4` (boolean)
+- `ae_exemption48_5` → `exemption_48_5` (boolean)
+- `ae_authorisation_other_emt` → `authorisation_other_emt`
+- `ae_DTI_FFG` → `dti_ffg` (boolean)
+- `ae_DTI` → `dti_codes` (pipe-separated)
+- `wp_url` → `white_paper_url`
+- `wp_authorisationNotificationDate` → `white_paper_notification_date`
+- `wp_comments` → `white_paper_comments`
+- `wp_lastupdate` → `white_paper_last_update`
 
-#### Opcja B: Bezpośrednio przez curl
-
-```bash
-curl -X POST https://mica-register-production.up.railway.app/api/admin/import
-```
-
-**Oczekiwana odpowiedź:**
-```json
-{
-  "message": "Data imported successfully",
-  "csv_path": "/app/data/cleaned/CASP20251215_clean.csv",
-  "entities_count": 118
-}
-```
-
-**Ważne:** Sprawdź czy `csv_path` wskazuje na najnowszy plik i czy `entities_count` się zgadza.
-
-### Krok 7: Sprawdź czy wszystko działa
-
-1. Otwórz stronę WWW
-2. Sprawdź czy liczba entities się zgadza (powinna być widoczna w headerze)
-3. Sprawdź czy data "Last updated" jest zaktualizowana
-4. Sprawdź kilka rekordów czy dane się zgadzają
+#### NCASP-specific:
+- `ae_website` → `websites` (pipe-separated multiple websites)
+- `ae_infrigment` → `infringement`
+- `ae_reason` → `reason`
+- `ae_decision_date` → `decision_date`
 
 ## 🐛 Rozwiązywanie problemów
 
-### Problem: Nadal widzę starą liczbę entities
+### Problem: "CSV file not found" podczas importu
 
 **Rozwiązanie:**
-1. Sprawdź czy import się udał (krok 7) - sprawdź odpowiedź endpointu
-2. Sprawdź czy endpoint użył najnowszego pliku (sprawdź `csv_path` w odpowiedzi)
-3. Wyczyść cache przeglądarki (Ctrl+Shift+R / Cmd+Shift+R)
-4. Sprawdź w trybie incognito
-5. Sprawdź w Railway logs czy nie było błędów
+1. Sprawdź czy plik istnieje w katalogu `data/raw/{register}/`
+2. Sprawdź nazwę pliku (musi zaczynać się od CASP/OTHER/ART/EMT/NCASP)
+3. Sprawdź format daty w nazwie pliku (yyyymmdd)
 
-### Problem: Błąd podczas importu - "CSV file not found"
+```bash
+# Sprawdź jakie pliki są w katalogu
+ls -la data/raw/casp/
+ls -la data/raw/other/
+# itd.
+```
 
-**Rozwiązanie:**
-1. Sprawdź czy plik `*_clean.csv` został dodany do commita i jest w katalogu `data/cleaned/`
-2. Sprawdź Railway logs:
-   - Railway dashboard → Twój projekt → Deployments → Ostatni deployment → Logs
-3. Sprawdź czy Dockerfile kopiuje katalog `data/` (linia 19 w `Dockerfile`)
-4. Zrób redeploy na Railway (Settings → Redeploy)
-
-### Problem: Błąd podczas importu - inne błędy
+### Problem: Błąd podczas importu - "Invalid encoding"
 
 **Rozwiązanie:**
-1. Sprawdź Railway logs:
-   - Railway dashboard → Twój projekt → Deployments → Ostatni deployment → Logs
-2. Sprawdź czy plik CSV jest poprawny (format, encoding)
-3. Uruchom walidację lokalnie: `python scripts/validate_csv.py data/cleaned/CASP20251215_clean.csv`
-4. Sprawdź czy wszystkie daty są w poprawnym formacie
+Skrypt automatycznie obsługuje różne encodingi (UTF-8, Latin-1, Windows-1252). Jeśli nadal jest problem:
+
+1. Sprawdź encoding pliku:
+   ```bash
+   file -b --mime-encoding data/raw/casp/CASP20260129.csv
+   ```
+
+2. Konwertuj do UTF-8 jeśli potrzebne:
+   ```bash
+   iconv -f WINDOWS-1252 -t UTF-8 data/raw/casp/CASP20260129.csv > temp.csv
+   mv temp.csv data/raw/casp/CASP20260129.csv
+   ```
+
+### Problem: Brakujące dane w bazie po imporcie
+
+**Rozwiązanie:**
+1. Sprawdź logi importu - skrypt pokazuje ile rekordów zaimportowano
+2. Sprawdź czy plik CSV ma poprawny format
+3. Uruchom import ponownie z flagą --verbose (jeśli dostępna)
+4. Sprawdź backend logs dla szczegółów błędów
 
 ### Problem: Frontend nie pokazuje nowej daty
 
 **Rozwiązanie:**
-1. Sprawdź czy Vercel zakończył deployment:
-   - Vercel dashboard → Twój projekt → Deployments
-2. Sprawdź czy commit został wypushowany
-3. Sprawdź czy zmiana w `App.jsx` została zapisana i dodana do commita
+1. Sprawdź czy zmiana w `App.jsx` została zapisana
+2. Przeładuj frontend (Ctrl+R / Cmd+R)
+3. Wyczyść cache przeglądarki (Ctrl+Shift+R / Cmd+Shift+R)
+4. Sprawdź czy vite server wykrył zmianę (powinien automatycznie hot reload)
 
-### Problem: Endpoint używa starego pliku zamiast nowego
+### Problem: Dane z różnych rejestrów mieszają się
 
 **Rozwiązanie:**
-1. Sprawdź czy nowy plik `*_clean.csv` jest w katalogu `data/cleaned/` i ma najnowszą datę modyfikacji
-2. Sprawdź czy plik został skopiowany do kontenera Docker (sprawdź Railway logs)
-3. Endpoint wybiera plik na podstawie daty modyfikacji - upewnij się, że nowy plik jest najnowszy
+To nie powinno się zdarzyć dzięki architekturze z `register_type`. Jeśli się zdarza:
+
+1. Sprawdź czy wszystkie importy używają poprawnej flagi `--register`
+2. Sprawdź w bazie danych:
+   ```sql
+   SELECT register_type, COUNT(*) FROM entities GROUP BY register_type;
+   ```
+3. W razie potrzeby wyczyść bazę i zaimportuj ponownie
 
 ## 📝 Checklist przed aktualizacją
 
-- [ ] Pobrano nowy plik CSV z ESMA
-- [ ] Plik zapisany w `data/raw/CASPYYYYMMDD.csv`
-- [ ] (Opcjonalnie) Uruchomiono walidację: `python scripts/validate_csv.py data/raw/CASPYYYYMMDD.csv`
-- [ ] Uruchomiono czyszczenie: `python scripts/clean_csv.py --input data/raw/CASPYYYYMMDD.csv`
-- [ ] Sprawdzono czy plik `*_clean.csv` został utworzony w `data/cleaned/`
-- [ ] (Opcjonalnie) Uruchomiono walidację wyczyszczonego pliku: `python scripts/validate_csv.py data/cleaned/CASPYYYYMMDD_clean.csv`
-- [ ] (Opcjonalnie) Jeśli są błędy: uruchomiono LLM remediation (krok 5)
+- [ ] Pobrano nowe pliki CSV z ESMA dla wybranych rejestrów
+- [ ] Pliki zapisane w odpowiednich katalogach `data/raw/{register}/`
+- [ ] Uruchomiono import: `python backend/app/import_csv.py --all` lub per rejestr
+- [ ] Sprawdzono statystyki importu (liczba zaimportowanych entities)
 - [ ] Zaktualizowano datę w `frontend/src/App.jsx`
-- [ ] Zrobiono commit i push na GitHub
-- [ ] Poczekano na deployment Railway i Vercel (2-5 minut)
-- [ ] Wywołano endpoint `/api/admin/import` na Railway
-- [ ] Sprawdzono odpowiedź endpointu (czy użył najnowszego pliku i czy liczba entities się zgadza)
-- [ ] Sprawdzono czy strona WWW pokazuje nowe dane
+- [ ] Sprawdzono czy aplikacja działa lokalnie (wszystkie zakładki)
+- [ ] (Opcjonalnie) Zrobiono commit i push na GitHub
+- [ ] (Opcjonalnie - produkcja) Zdeployowano do Railway/Vercel
 
-## 🔄 Automatyzacja
+## 🔄 Automatyzacja (przyszłość)
 
 ### Obecny stan
 
 ✅ **Zaimplementowane:**
 - Automatyczne sprawdzanie strony ESMA pod kątem nowych aktualizacji
-- Automatyczne pobieranie najnowszego pliku CSV
-- Automatyczne uruchomienie pełnego pipeline'u (walidacja → cleaning → LLM → import)
-- Skrypt orchestracji: `scripts/update_esma_data.py`
+- Automatyczne pobieranie plików CSV dla wszystkich rejestrów
+- Skrypt orchestracji: `scripts/update_esma_data.py --all`
+- Multi-register import: `backend/app/import_csv.py --all`
 
 ⏳ **Do zaimplementowania (planowane):**
+- Automatyczna walidacja i czyszczenie plików CSV
+- Automatyczny import po pobraniu
 - Automatyczny commit i push do GitHub
-- Automatyczne wywołanie Railway API importu
 - Cron job do regularnego sprawdzania i aktualizacji
 - Notyfikacje (email/Slack) po aktualizacji
-
-Zobacz `TODO.md` dla szczegółów dotyczących pełnej automatyzacji.
+- Per-register "Last updated" display w UI
 
 ## 🔗 Przydatne linki
 
-- **Railway Dashboard:** https://railway.app
-- **Vercel Dashboard:** https://vercel.com
-- **ESMA Register:** https://www.esma.europa.eu/press-news/esma-news/esma-publishes-first-list-crypto-asset-service-providers-casps-authorised-under-mica
-- **Railway API URL:** https://mica-register-production.up.railway.app
-- **LLM Remediation Documentation:** `docs/LLM_REMEDIATION_DESIGN.md`
+- **ESMA MiCA Registers:** https://www.esma.europa.eu/press-news/esma-news/esma-publishes-first-list-crypto-asset-service-providers-casps-authorised-under-mica
+- **Railway Dashboard:** https://railway.app (opcjonalnie, dla produkcji)
+- **Vercel Dashboard:** https://vercel.com (opcjonalnie, dla produkcji)
+- **GitHub Repository:** https://github.com/your-repo/mica-register
 
 ## 📞 Kontakt / Wsparcie
 
 Jeśli masz problemy z aktualizacją:
-1. Sprawdź logi w Railway
-2. Sprawdź logi w Vercel
-3. Sprawdź czy wszystkie kroki zostały wykonane
-4. Sprawdź dokumentację skryptów w `docs/CSV_CLEANING.md` i `docs/CSV_VALIDATION.md`
+1. Sprawdź logi w konsoli podczas importu
+2. Sprawdź czy wszystkie kroki zostały wykonane
+3. Sprawdź dokumentację w `README.md`
+4. Sprawdź backend logs (`uvicorn app.main:app --reload`)
 
 ---
 
-**Ostatnia aktualizacja instrukcji:** 15 grudnia 2025
+**Ostatnia aktualizacja instrukcji:** 29 stycznia 2026
