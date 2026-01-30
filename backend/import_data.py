@@ -5,54 +5,39 @@ Run this after setting up the database.
 
 Automatically finds the newest *_clean.csv file in data/cleaned/ directory
 based on date in filename (YYYYMMDD), not file modification time.
+
+Note: This is a legacy script. For multi-register imports, use import_all_registers.py instead.
 """
 import sys
 import os
-import re
 from pathlib import Path
-from glob import glob
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from app.database import SessionLocal, engine, Base
 from app.import_csv import import_csv_to_db
+from app.models import RegisterType
+from app.utils.file_utils import get_latest_csv_for_register, get_base_data_dir
 
 if __name__ == "__main__":
     # Create database tables first
     print("Creating database tables...")
     Base.metadata.create_all(bind=engine)
     print("Tables created successfully!")
-    
-    # Find the newest cleaned CSV file automatically
-    base_paths = [
-        Path("/app/data/cleaned"),  # Docker container
-        Path(__file__).parent.parent / "data" / "cleaned",  # Local dev
-    ]
-    
-    csv_path = None
-    newest_file = None
-    newest_date = None
-    
-    # Pattern to extract date from filename: CASPYYYYMMDD_clean.csv
-    date_pattern = re.compile(r'CASP(\d{8})_clean\.csv$')
-    
-    for base_path in base_paths:
-        if base_path.exists():
-            # Find all *_clean.csv files
-            pattern = str(base_path / "*_clean.csv")
-            for file_path in glob(pattern):
-                # Extract date from filename
-                match = date_pattern.search(file_path)
-                if match:
-                    file_date_str = match.group(1)  # YYYYMMDD
-                    # Compare dates as strings (YYYYMMDD format sorts correctly)
-                    if newest_date is None or file_date_str > newest_date:
-                        newest_date = file_date_str
-                        newest_file = file_path
-    
-    if newest_file:
-        csv_path = newest_file
+
+    # Find the newest cleaned CASP CSV file using file_utils
+    base_dir = get_base_data_dir() / "cleaned"
+
+    csv_path = get_latest_csv_for_register(
+        RegisterType.CASP,
+        base_dir,
+        file_stage="cleaned",
+        prefer_llm=True
+    )
+
+    if csv_path:
+        csv_path = str(csv_path)
     else:
         # Fallback: try old locations for backward compatibility
         possible_paths = [

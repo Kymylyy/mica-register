@@ -13,18 +13,22 @@ from app.import_csv import import_csv_to_db
 from app.database import SessionLocal, engine, Base
 from app.models import Entity, RegisterType
 from app.config.registers import get_register_config
+from app.utils.file_utils import get_latest_csv_for_register, get_base_data_dir
 
 def clean_csv():
     """Clean the newest raw CASP CSV"""
-    # Find newest raw CSV
-    raw_dir = Path(__file__).parent.parent / "data" / "raw"
-    casp_files = sorted(raw_dir.glob("CASP*.csv"))
+    # Find newest raw CSV using file_utils
+    base_dir = get_base_data_dir()
+    newest_csv = get_latest_csv_for_register(
+        RegisterType.CASP,
+        base_dir / "raw",
+        file_stage="raw"
+    )
 
-    if not casp_files:
+    if not newest_csv:
         print("Error: No CASP CSV files found in data/raw/")
         return None
 
-    newest_csv = casp_files[-1]
     print(f"\n1. Cleaning CSV: {newest_csv.name}")
 
     # Clean CSV
@@ -35,8 +39,8 @@ def clean_csv():
 
     cleaner.fix_all_issues()
 
-    # Save cleaned CSV
-    cleaned_dir = Path(__file__).parent.parent / "data" / "cleaned"
+    # Save cleaned CSV to proper subdirectory
+    cleaned_dir = base_dir / "cleaned" / "casp"
     cleaned_dir.mkdir(parents=True, exist_ok=True)
 
     cleaned_path = cleaned_dir / f"{newest_csv.stem}_clean.csv"

@@ -20,7 +20,7 @@ from .import_csv import (
     fix_encoding_issues as fix_text_encoding,  # Rename to avoid conflict
     normalize_commercial_name,
     fix_address_website_parsing,
-    merge_entities_by_lei,
+    merge_entities_by_lei,  # Not used - kept for reference
     normalize_service_code,
     MICA_SERVICE_DESCRIPTIONS,
     is_url,
@@ -472,7 +472,14 @@ class CSVCleaner:
                 # Leave original value - don't modify (import_csv.py will handle)
 
     def merge_duplicate_lei(self) -> None:
-        """Merge rows with duplicate LEI codes"""
+        """
+        [DEPRECATED - NOT USED]
+        This method is no longer called. Duplicate LEI rows are preserved as-is.
+        Kept for reference only.
+        """
+        return  # Early exit - method not used
+
+        # Legacy merge logic retained for reference (inactive)
         if self.df is None:
             return
 
@@ -610,9 +617,9 @@ class CSVCleaner:
         print("Fixing LEI format...")
         self.fix_lei_format()
         
-        # 8. Merge duplicate LEI
-        print("Merging duplicate LEI...")
-        self.merge_duplicate_lei()
+        # 8. [REMOVED] Merge duplicate LEI - preserving all rows
+        # Duplicate LEI codes are now allowed (e.g., OTHER: one LEI, many white papers)
+        print("Skipping duplicate LEI merge (preserving all rows)...")
         
         # 9. Fix address/website parsing
         print("Fixing address/website parsing...")

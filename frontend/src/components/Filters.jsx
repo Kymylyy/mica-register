@@ -3,41 +3,7 @@ import api from '../utils/api';
 import { FlagIcon } from './FlagIcon';
 import { getServiceDescriptionCapitalized, getServiceCodeOrder, getServiceShortName, getServiceDescription } from '../utils/serviceDescriptions';
 import { useDebounce } from '../utils/debounce';
-
-// Country code to full English name mapping
-const COUNTRY_NAMES = {
-  'AT': 'Austria',
-  'BE': 'Belgium',
-  'BG': 'Bulgaria',
-  'CY': 'Cyprus',
-  'CZ': 'Czech Republic',
-  'DE': 'Germany',
-  'DK': 'Denmark',
-  'EE': 'Estonia',
-  'ES': 'Spain',
-  'FI': 'Finland',
-  'FR': 'France',
-  'GR': 'Greece',
-  'HR': 'Croatia',
-  'HU': 'Hungary',
-  'IE': 'Ireland',
-  'IS': 'Iceland',
-  'IT': 'Italy',
-  'LI': 'Liechtenstein',
-  'LT': 'Lithuania',
-  'LU': 'Luxembourg',
-  'LV': 'Latvia',
-  'MT': 'Malta',
-  'NL': 'Netherlands',
-  'NO': 'Norway',
-  'PL': 'Poland',
-  'PT': 'Portugal',
-  'RO': 'Romania',
-  'SE': 'Sweden',
-  'SI': 'Slovenia',
-  'SK': 'Slovakia',
-  'EL': 'Greece', // Alternative code for Greece
-};
+import { COUNTRY_NAMES } from '../utils/countryNames';
 
 export function Filters({ registerType = 'casp', filters, onFiltersChange, onClearFilters, isVisible = true, onToggleVisibility }) {
   const [filterOptions, setFilterOptions] = useState({
@@ -144,26 +110,45 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
   };
 
   useEffect(() => {
-    // Fetch filter options for current register type
-    api.get(`/api/filters/options?register_type=${registerType}`)
+    // Fetch filter options for current register type with AbortController
+    const abortController = new AbortController();
+
+    api.get(`/api/filters/options?register_type=${registerType}`, {
+      signal: abortController.signal
+    })
       .then(response => {
-        // Sort service codes by MiCA order (only for CASP)
-        const serviceCodes = response.data.service_codes || [];
-        const sortedServiceCodes = serviceCodes.sort((a, b) =>
-          getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code)
-        );
-        setFilterOptions({
-          ...response.data,
-          service_codes: sortedServiceCodes.map(s => ({
-            ...s,
-            description: getServiceShortName(s.code) // Use short names like in table
-          }))
-        });
+        // Only update state if not aborted
+        if (!abortController.signal.aborted) {
+          // Sort service codes by MiCA order (only for CASP)
+          const serviceCodes = response.data.service_codes || [];
+          const sortedServiceCodes = serviceCodes.sort((a, b) =>
+            getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code)
+          );
+          setFilterOptions({
+            ...response.data,
+            service_codes: sortedServiceCodes.map(s => ({
+              ...s,
+              description: getServiceShortName(s.code) // Use short names like in table
+            }))
+          });
+        }
       })
       .catch(error => {
+        // Ignore errors from cancelled requests
+        if (
+          error.name === 'CanceledError' ||
+          error.name === 'AbortError' ||
+          error.code === 'ERR_CANCELED' ||
+          abortController.signal.aborted
+        ) {
+          return;
+        }
         console.error('Error fetching filter options:', error);
         console.error('Error details:', error.response?.data);
       });
+
+    // Cleanup on unmount or registerType change
+    return () => abortController.abort();
   }, [registerType]);
 
   // Sync date inputs with filters (convert YYYY-MM-DD to DD-MM-YYYY for display)
@@ -507,7 +492,8 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
 
           {/* Filter Pills Row */}
           <div className="flex flex-wrap gap-3">
-            {/* Authorisation Date Filter */}
+            {/* Authorisation Date Filter - hidden for OTHER register */}
+            {registerType !== 'other' && (
             <details 
               ref={authDateDetailsRef}
               className="relative"
@@ -764,6 +750,7 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
                 )}
               </div>
             </details>
+            )}
 
             {/* Home Member State Filter */}
             <details 
@@ -919,13 +906,13 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
                             return (
                               <label
                                 key={`${country.country_code}-${idx}`}
-                                className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
                               >
                                 <input
                                   type="checkbox"
                                   checked={(filters.home_member_states || []).includes(country.country_code)}
                                   onChange={() => handleHomeMemberStateToggle(country.country_code)}
-                                  className="mt-1 rounded"
+                                  className="rounded"
                                 />
                                 <span className="text-sm flex-1 flex items-center gap-1.5">
                                   <FlagIcon countryCode={country.country_code} size="sm" />
@@ -1086,13 +1073,13 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
                             return (
                               <label
                                 key={service.code}
-                                className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
                               >
                                 <input
                                   type="checkbox"
                                   checked={(filters.service_codes || []).includes(service.code)}
                                   onChange={() => handleServiceCodeToggle(service.code)}
-                                  className="mt-1 rounded"
+                                  className="rounded"
                                 />
                                 <span className="text-sm flex-1" title={fullDescription}>
                                   {shortName}

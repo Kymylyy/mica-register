@@ -37,13 +37,17 @@ from check_esma_update import get_esma_update_date, get_latest_csv_date
 # Add backend to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
-# Register configuration: name -> (CSV filename prefix, CSV URL)
+# Import from centralized configuration
+from app.config.registers import REGISTER_CSV_URLS, get_register_config
+from app.models import RegisterType
+
+# Build config from central source
 REGISTER_CONFIG = {
-    'casp': ('CASP', 'https://www.esma.europa.eu/sites/default/files/2024-12/CASPS.csv'),
-    'other': ('OTHER', 'https://www.esma.europa.eu/sites/default/files/2024-12/OTHER.csv'),
-    'art': ('ART', 'https://www.esma.europa.eu/sites/default/files/2024-12/ARTZZ.csv'),
-    'emt': ('EMT', 'https://www.esma.europa.eu/sites/default/files/2024-12/EMTWP.csv'),
-    'ncasp': ('NCASP', 'https://www.esma.europa.eu/sites/default/files/2024-12/NCASP.csv'),
+    register_type.value: (
+        get_register_config(register_type).csv_prefix,
+        REGISTER_CSV_URLS[register_type]
+    )
+    for register_type in RegisterType
 }
 
 

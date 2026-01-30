@@ -126,6 +126,7 @@ class RegisterConfig:
         self,
         register_type: RegisterType,
         csv_url: str,
+        csv_prefix: str,  # NEW: e.g., "CASP", "ART"
         column_mapping: Dict[str, str],
         csv_separator: str = ',',
         date_format: str = '%d/%m/%Y',  # Most registers use DD/MM/YYYY
@@ -135,6 +136,7 @@ class RegisterConfig:
     ):
         self.register_type = register_type
         self.csv_url = csv_url
+        self.csv_prefix = csv_prefix  # NEW
         self.column_mapping = column_mapping
         self.csv_separator = csv_separator
         self.date_format = date_format
@@ -181,6 +183,7 @@ REGISTERS = {
     RegisterType.CASP: RegisterConfig(
         register_type=RegisterType.CASP,
         csv_url=REGISTER_CSV_URLS[RegisterType.CASP],
+        csv_prefix="CASP",
         column_mapping=CASP_COLUMNS,
         csv_separator=',',
         date_format='%d/%m/%Y',  # CASP uses DD/MM/YYYY
@@ -194,6 +197,7 @@ REGISTERS = {
     RegisterType.OTHER: RegisterConfig(
         register_type=RegisterType.OTHER,
         csv_url=REGISTER_CSV_URLS[RegisterType.OTHER],
+        csv_prefix="OTHER",
         column_mapping=OTHER_COLUMNS,
         csv_separator=',',
         date_format='%d/%m/%Y',
@@ -210,6 +214,7 @@ REGISTERS = {
     RegisterType.ART: RegisterConfig(
         register_type=RegisterType.ART,
         csv_url=REGISTER_CSV_URLS[RegisterType.ART],
+        csv_prefix="ART",
         column_mapping=ART_COLUMNS,
         csv_separator=',',
         date_format='%d/%m/%Y',
@@ -225,6 +230,7 @@ REGISTERS = {
     RegisterType.EMT: RegisterConfig(
         register_type=RegisterType.EMT,
         csv_url=REGISTER_CSV_URLS[RegisterType.EMT],
+        csv_prefix="EMT",
         column_mapping=EMT_COLUMNS,
         csv_separator=',',
         date_format='%d/%m/%Y',
@@ -242,12 +248,16 @@ REGISTERS = {
     RegisterType.NCASP: RegisterConfig(
         register_type=RegisterType.NCASP,
         csv_url=REGISTER_CSV_URLS[RegisterType.NCASP],
+        csv_prefix="NCASP",
         column_mapping=NCASP_COLUMNS,
         csv_separator=',',
         date_format='%d/%m/%Y',
         required_columns=['ae_homeMemberState'],  # Note: LEI often missing in NCASP
         multi_value_fields={
             'websites': '|',  # Multiple websites separated by |
+        },
+        boolean_fields={
+            'infringement': parse_yes_no,
         },
     ),
 }

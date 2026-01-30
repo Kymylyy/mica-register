@@ -9,13 +9,13 @@ const REGISTERS = [
   {
     id: 'casp',
     path: '/casp',
-    label: 'CASPs',
+    label: 'CASP',
     description: 'Crypto-Asset Service Providers',
   },
   {
     id: 'other',
     path: '/other',
-    label: 'White Papers',
+    label: 'WHITE PAPER',
     description: 'Other Crypto-Assets White Papers',
   },
   {
@@ -33,7 +33,7 @@ const REGISTERS = [
   {
     id: 'ncasp',
     path: '/ncasp',
-    label: 'Non-Compliant',
+    label: 'NON-COMPLIANT ENTITIES',
     description: 'Non-Compliant Entities',
   },
 ];

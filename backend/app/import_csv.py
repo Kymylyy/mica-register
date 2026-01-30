@@ -2,6 +2,7 @@ import pandas as pd
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+import logging
 from .models import (
     Entity, Service, PassportCountry,
     CaspEntity, OtherEntity, ArtEntity, EmtEntity, NcaspEntity,
@@ -12,6 +13,9 @@ from .config.registers import (
     parse_yes_no, parse_true_false
 )
 from typing import List, Optional
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 
 def parse_date(date_str: Optional[str], date_format: str = "%d/%m/%Y") -> Optional[datetime]:
@@ -289,6 +293,12 @@ def fix_address_website_parsing(row: pd.Series) -> tuple[Optional[str], Optional
 
 def merge_entities_by_lei(df: pd.DataFrame, register_type: RegisterType = RegisterType.CASP) -> pd.DataFrame:
     """
+    [DEPRECATED - NOT USED]
+
+    This function is no longer called in the CSV pipeline.
+    All rows are preserved as-is, including those with duplicate LEI codes.
+    Kept for reference only.
+
     Merge rows with the same LEI into single rows.
     Combines register-specific fields and uses latest dates.
 
@@ -299,6 +309,15 @@ def merge_entities_by_lei(df: pd.DataFrame, register_type: RegisterType = Regist
     Returns:
         DataFrame with merged entities
     """
+    import warnings
+    warnings.warn(
+        "merge_entities_by_lei() is deprecated and should not be called.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return df  # Return unchanged - no merge
+
+    # Legacy merge logic retained for reference (inactive)
     # Get register configuration
     config = get_register_config(register_type)
 
@@ -409,8 +428,11 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
     Expects a cleaned CSV file (from csv_clean.py) with:
     - UTF-8 encoding
     - Already fixed encoding issues
-    - Already merged duplicate LEI rows (for CASP)
+    - All rows preserved (no deduplication by LEI or other fields)
     - Already normalized service codes, commercial names, addresses, etc.
+
+    Note: Duplicate LEI codes are allowed and preserved.
+    Example: OTHER register may have multiple rows with same LEI (different white papers).
 
     This function handles:
     - Reading the cleaned CSV
@@ -424,14 +446,29 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
     # Read cleaned CSV (should be UTF-8, already cleaned)
     try:
         df = pd.read_csv(csv_path, encoding='utf-8-sig')
+        logger.info(f"Successfully read cleaned CSV file: {csv_path} ({len(df)} rows)")
         print(f"Successfully read cleaned CSV file: {len(df)} rows")
-    except UnicodeDecodeError:
+    except pd.errors.EmptyDataError:
+        print(f"⚠ CSV file is empty, skipping {register_type.value.upper()} import")
+        return
+    except UnicodeDecodeError as e:
+        logger.warning(f"UTF-8-sig decode failed for {csv_path}: {e}")
         # Fallback for edge cases
         try:
             df = pd.read_csv(csv_path, encoding='utf-8', encoding_errors='replace')
+            logger.info(f"Successfully read {csv_path} with UTF-8 fallback encoding")
             print("Read CSV with UTF-8 fallback encoding")
+        except pd.errors.EmptyDataError:
+            print(f"⚠ CSV file is empty, skipping {register_type.value.upper()} import")
+            return
         except Exception as e:
+            logger.error(f"Failed to read CSV file {csv_path}: {e}", exc_info=True)
             raise ValueError(f"Could not read CSV file. Expected cleaned UTF-8 file. Error: {e}")
+
+    # Check if DataFrame is empty (no rows)
+    if len(df) == 0:
+        print(f"⚠ No data rows in CSV file, skipping {register_type.value.upper()} import")
+        return
 
     # Clear existing data for this register type ONLY
     # Delete entities and their extensions for this register
@@ -673,5 +710,3 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
     # Commit everything at once
     db.commit()
     print(f"✓ Successfully imported {imported_count} {register_type.value.upper()} entities")
-
-
