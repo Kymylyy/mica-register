@@ -41,7 +41,8 @@ Thumbs.db
 
 # Environment
 .env
-.env.local
+.env.*
+!.env.example
 
 # Reports and temporary files
 reports/
