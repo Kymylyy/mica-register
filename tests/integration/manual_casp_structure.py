@@ -5,8 +5,9 @@ Test script to verify CASP structure after refactoring (without importing data).
 import sys
 from pathlib import Path
 
-# Add backend directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+# Add backend directory to path (repo-root/backend)
+# Path: tests/integration/manual_*.py -> tests/ -> repo-root/ -> backend/
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
 def test_imports():
     """Test that all modules import correctly"""

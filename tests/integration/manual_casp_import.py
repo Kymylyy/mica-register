@@ -5,8 +5,9 @@ Test script to clean and import CASP data, then verify functionality.
 import sys
 from pathlib import Path
 
-# Add backend directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+# Add backend directory to path (repo-root/backend)
+# Path: tests/integration/manual_*.py -> tests/ -> repo-root/ -> backend/
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
 from app.csv_clean import CSVCleaner
 from app.import_csv import import_csv_to_db
