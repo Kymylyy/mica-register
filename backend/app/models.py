@@ -69,7 +69,7 @@ class Entity(Base):
     # Common fields (present in all registers)
     competent_authority = Column(String, index=True)
     home_member_state = Column(String(2), index=True)
-    lei_name = Column(String)
+    lei_name = Column(String, index=True)  # Index added for search performance
     lei = Column(String, nullable=True, index=True)  # Nullable (NCASP often missing)
     lei_cou_code = Column(String(2))
 

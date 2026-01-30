@@ -1,0 +1,4 @@
+ae_competentAuthority,ae_lei_name,ae_lei_casp,ae_lei_name_casp,ae_homeMemberState,ae_lei_cou_code,ae_offerCode_cou,wp_url,ae_DTI_FFG,ae_DTI,wp_comments
+BaFin,Tether Operations Limited,5299001HFNLCLQMF3X50,Binance Europe Services Ltd.,DE,DE,DE|FR|IT,https://tether.to/whitepaper.pdf,YES,DTI-001|DTI-002,Approved with conditions
+AMF,Circle Internet Financial,969500CX1Y60EXKXQH23,Crypto Exchange France,FR,FR,FR|BE|LU,https://circle.com/usdc,NO,,Standard approval
+CSSF,Paxos Trust Company,,,LU,LU,LU|DE|FR|BE,https://paxos.com/whitepaper,YES,DTI-003,Cross-border offering approved

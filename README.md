@@ -373,10 +373,10 @@ The CSV import process follows a multi-stage pipeline:
 - Fixes encoding issues (German characters, broken quotation marks)
 - Normalizes service codes to MiCA standard (a-j)
 - Fixes date formats (DD/MM/YYYY)
-- Merges duplicate LEI entries
 - Normalizes country codes and commercial names
 - Handles pipe-separated values
 - Generates cleaning reports
+ - **Note**: Duplicate LEI codes are preserved (e.g., OTHER register with multiple white papers per LEI)
 
 ### 4. Import
 - Imports CSV to database

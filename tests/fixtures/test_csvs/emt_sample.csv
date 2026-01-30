@@ -1,0 +1,4 @@
+ae_competentAuthority,ae_lei,ae_lei_name,ae_commercial_name,ae_homeMemberState,ae_lei_cou_code,ae_exemption48_4,ae_exemption48_5,ae_authorisation_other_emt,wp_authorisationNotificationDate,wp_url,ae_DTI_FFG,ae_DTI,ac_authorisationNotificationDate,ac_authorisationEndDate,wp_comments
+BaFin,5299001HFNLCLQMF3X50,German E-Money Token GmbH,German E-Money Token,DE,DE,YES,NO,Credit institution under CRD,15/12/2024,https://de-emoney.de/wp.pdf,YES,EMT-001|EMT-002,15/01/2025,,Full compliance verified
+AMF,969500CX1Y60EXKXQH23,French Digital Euro SA,French Digital Euro,FR,FR,NO,YES,Payment institution,20/01/2024,https://fr-digital-euro.fr/whitepaper,NO,,20/02/2024,31/12/2025,Exemption approved
+CSSF,549300VQCFXP8VPUWM89,Lux E-Money Platform SA,Lux E-Money Platform,LU,LU,YES,YES,Both exemptions apply,05/02/2023,https://lux-emoney.lu/wp,YES,EMT-003,10/03/2023,,Dual exemption case

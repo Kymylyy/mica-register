@@ -20,6 +20,30 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.csv_validate import validate_csv, Severity
+from app.models import RegisterType
+from app.config.registers import get_register_config
+from typing import Optional
+
+
+def detect_register_type(filename: str) -> Optional[RegisterType]:
+    """Detect register type from CSV filename.
+
+    Examples:
+        CASP20260130.csv → RegisterType.CASP
+        ART20260129_clean.csv → RegisterType.ART
+
+    Args:
+        filename: CSV filename to detect from
+
+    Returns:
+        RegisterType if detected, None otherwise
+    """
+    filename_upper = filename.upper()
+    for register_type in RegisterType:
+        prefix = get_register_config(register_type).csv_prefix
+        if filename_upper.startswith(prefix):
+            return register_type
+    return None
 
 
 def print_summary(report: dict, strict: bool = False) -> None:
@@ -156,9 +180,21 @@ Examples:
         print(f"Error: File not found: {args.csv_file}", file=sys.stderr)
         return 2
 
+    # Detect register type (with fallback to CASP)
+    register_type = detect_register_type(args.csv_file.name)
+    if register_type:
+        print(f"Detected register: {register_type.value.upper()}")
+    else:
+        print("⚠️  Warning: Could not detect register type, falling back to CASP")
+        register_type = RegisterType.CASP  # Fallback
+
     # Run validation
     try:
-        report = validate_csv(args.csv_file, max_examples=args.max_examples)
+        report = validate_csv(
+            args.csv_file,
+            register_type=register_type,
+            max_examples=args.max_examples
+        )
     except Exception as e:
         print(f"Error during validation: {e}", file=sys.stderr)
         import traceback

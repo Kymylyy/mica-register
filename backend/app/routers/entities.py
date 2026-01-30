@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, func, distinct, exists
+from sqlalchemy import or_, and_, func, distinct, exists, select
 from typing import List, Optional
 from datetime import date
 from ..database import get_db, engine, Base
@@ -9,7 +9,7 @@ from ..models import (
     entity_service, casp_entity_service,  # Legacy and new association tables
     CaspEntity
 )
-from ..schemas import Entity as EntitySchema, EntityTag as EntityTagSchema, TagCreate, EntityUpdate
+from ..schemas import Entity as EntitySchema, EntityTag as EntityTagSchema, TagCreate, EntityUpdate, PaginatedResponse
 from ..config.registers import RegisterType
 
 router = APIRouter()
@@ -166,7 +166,7 @@ def apply_search_filter(query, search: str, register_type: RegisterType = Regist
     return query
 
 
-@router.get("/entities", response_model=List[EntitySchema])
+@router.get("/entities", response_model=PaginatedResponse)
 def get_entities(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -178,11 +178,16 @@ def get_entities(
     auth_date_to: Optional[date] = None,
     db: Session = Depends(get_db)
 ):
-    """Get list of entities with filtering
+    """Get list of entities with filtering and pagination metadata
 
     Args:
         register_type: Register type (casp, other, art, emt, ncasp). Default: casp
+        skip: Number of records to skip (for pagination)
+        limit: Maximum number of records to return
         Other filters apply based on register type
+
+    Returns:
+        PaginatedResponse with items, total count, and pagination info
     """
     query = db.query(Entity)
 
@@ -196,10 +201,16 @@ def get_entities(
     # Service codes filter - only applicable for CASP
     if service_codes and len(service_codes) > 0:
         if register_type == RegisterType.CASP:
-            # For CASP, join through casp_entity relationship
-            query = query.join(Entity.casp_entity).join(CaspEntity.services).filter(
-                Service.code.in_(service_codes)
-            ).distinct()
+            # AND logic: entity must have ALL selected services
+            # Count how many selected services each entity has
+            service_count_subquery = (
+                select(CaspEntity.id)
+                .join(CaspEntity.services)
+                .filter(Service.code.in_(service_codes))
+                .group_by(CaspEntity.id)
+                .having(func.count(Service.code) == len(service_codes))
+            )
+            query = query.filter(Entity.id.in_(service_count_subquery))
         # For other registers, ignore service_codes filter
 
     if search:
@@ -211,8 +222,20 @@ def get_entities(
     if auth_date_to:
         query = query.filter(Entity.authorisation_notification_date <= auth_date_to)
 
+    # Get total count before pagination
+    total = query.count()
+
+    # Apply pagination
     entities = query.offset(skip).limit(limit).all()
-    return entities
+
+    # Return paginated response with metadata
+    return PaginatedResponse(
+        items=entities,
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=(skip + limit) < total
+    )
 
 
 @router.get("/entities/count")
@@ -238,9 +261,15 @@ def get_entities_count(
     # Service codes filter - only for CASP
     if service_codes and len(service_codes) > 0:
         if register_type == RegisterType.CASP:
-            query = query.join(Entity.casp_entity).join(CaspEntity.services).filter(
-                Service.code.in_(service_codes)
-            ).distinct()
+            # AND logic: entity must have ALL selected services
+            service_count_subquery = (
+                select(CaspEntity.id)
+                .join(CaspEntity.services)
+                .filter(Service.code.in_(service_codes))
+                .group_by(CaspEntity.id)
+                .having(func.count(Service.code) == len(service_codes))
+            )
+            query = query.filter(Entity.id.in_(service_count_subquery))
 
     if search:
         query = apply_search_filter(query, search, register_type)
@@ -380,11 +409,16 @@ def get_filter_counts(
     if auth_date_to:
         country_query = country_query.filter(Entity.authorisation_notification_date <= auth_date_to)
 
-    # Apply service_codes filter if present (CASP only)
+    # Apply service_codes filter if present (CASP only) - AND logic
     if service_codes and len(service_codes) > 0 and register_type == RegisterType.CASP:
-        country_query = country_query.join(Entity.casp_entity).join(CaspEntity.services).filter(
-            Service.code.in_(service_codes)
+        service_count_subquery = (
+            select(CaspEntity.id)
+            .join(CaspEntity.services)
+            .filter(Service.code.in_(service_codes))
+            .group_by(CaspEntity.id)
+            .having(func.count(Service.code) == len(service_codes))
         )
+        country_query = country_query.filter(Entity.id.in_(service_count_subquery))
 
     # Group by country and get counts
     country_query = country_query.group_by(Entity.home_member_state)
@@ -401,7 +435,8 @@ def get_filter_counts(
     service_counts = {}
 
     if register_type == RegisterType.CASP:
-        # Build base query for services with all filters EXCEPT service_codes
+        # Build base query for services with all filters
+        # With AND logic, we need to show services only on entities that have ALL currently selected services
         service_query = db.query(
             Service.code,
             func.count(distinct(Entity.id)).label('count')
@@ -409,9 +444,20 @@ def get_filter_counts(
             Entity.register_type == RegisterType.CASP
         )  # Join through casp_entity
 
-        # Apply filters (excluding service_codes)
+        # Apply filters
         if home_member_states and len(home_member_states) > 0:
             service_query = service_query.filter(Entity.home_member_state.in_(home_member_states))
+
+        # Apply service_codes filter with AND logic - show counts only for entities that have ALL selected services
+        if service_codes and len(service_codes) > 0:
+            service_count_subquery = (
+                select(CaspEntity.id)
+                .join(CaspEntity.services)
+                .filter(Service.code.in_(service_codes))
+                .group_by(CaspEntity.id)
+                .having(func.count(Service.code) == len(service_codes))
+            )
+            service_query = service_query.filter(Entity.id.in_(service_count_subquery))
 
         if search:
             service_query = apply_search_filter(service_query, search, register_type)
@@ -504,47 +550,31 @@ def update_entity(
 @router.post("/admin/import")
 def import_data(db: Session = Depends(get_db)):
     """Import CSV data into database (admin endpoint)
-    
+
     Automatically finds the newest *_clean.csv file in data/cleaned/ directory
     based on date in filename (YYYYMMDD), not file modification time.
     Works both in Docker container and local development.
+
+    Note: This endpoint currently imports CASP register only.
+    For multi-register imports, use the import_all_registers.py script.
     """
     import os
-    import re
     from pathlib import Path
-    from glob import glob
     from ..import_csv import import_csv_to_db
-    
-    # Find the newest cleaned CSV file automatically
-    # Works both in Docker and local dev
-    base_paths = [
-        Path("/app/data/cleaned"),  # Docker container
-        Path(__file__).parent.parent.parent.parent / "data" / "cleaned",  # Local dev (from backend/app/routers/ to project root)
-    ]
-    
-    csv_path = None
-    newest_file = None
-    newest_date = None
-    
-    # Pattern to extract date from filename: CASPYYYYMMDD_clean.csv
-    date_pattern = re.compile(r'CASP(\d{8})_clean\.csv$')
-    
-    for base_path in base_paths:
-        if base_path.exists():
-            # Find all *_clean.csv files
-            pattern = str(base_path / "*_clean.csv")
-            for file_path in glob(pattern):
-                # Extract date from filename
-                match = date_pattern.search(file_path)
-                if match:
-                    file_date_str = match.group(1)  # YYYYMMDD
-                    # Compare dates as strings (YYYYMMDD format sorts correctly)
-                    if newest_date is None or file_date_str > newest_date:
-                        newest_date = file_date_str
-                        newest_file = file_path
-    
-    if newest_file:
-        csv_path = newest_file
+    from ..models import RegisterType
+    from ..utils.file_utils import get_latest_csv_for_register, get_base_data_dir
+
+    # Find newest cleaned CASP CSV using file_utils
+    base_dir = get_base_data_dir() / "cleaned"
+    csv_file = get_latest_csv_for_register(
+        RegisterType.CASP,
+        base_dir,
+        file_stage="cleaned",
+        prefer_llm=True
+    )
+
+    if csv_file:
+        csv_path = str(csv_file)
     else:
         # Fallback: try old locations for backward compatibility
         possible_paths = [
@@ -554,16 +584,17 @@ def import_data(db: Session = Depends(get_db)):
             os.path.join(Path(__file__).parent.parent.parent, "casp-register.csv"),
             "casp-register.csv",
         ]
-        
+
+        csv_path = None
         for path in possible_paths:
             if os.path.exists(path):
                 csv_path = path
                 break
-    
+
     if not csv_path:
         raise HTTPException(
-            status_code=404, 
-            detail=f"CSV file not found. Checked data/cleaned/ directory for *_clean.csv files and fallback locations."
+            status_code=404,
+            detail=f"CSV file not found. Checked data/cleaned/ directory for CASP *_clean.csv files and fallback locations."
         )
     
     try:

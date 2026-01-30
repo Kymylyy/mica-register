@@ -133,3 +133,14 @@ class EntityUpdate(BaseModel):
     comments: Optional[str] = None
 
 
+class PaginatedResponse(BaseModel):
+    """Paginated response with metadata"""
+    items: List['Entity']
+    total: int
+    skip: int
+    limit: int
+    has_more: bool
+
+    class Config:
+        from_attributes = True
+
