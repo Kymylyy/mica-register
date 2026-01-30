@@ -470,32 +470,6 @@ class CSVCleaner:
                 ))
                 # Leave original value - don't modify (import_csv.py will handle)
 
-    def merge_duplicate_lei(self) -> None:
-        """
-        [DEPRECATED - NOT USED]
-        This method is no longer called. Duplicate LEI rows are preserved as-is.
-        Kept for reference only.
-        """
-        return  # Early exit - method not used
-
-        # Legacy merge logic retained for reference (inactive)
-        if self.df is None:
-            return
-
-        initial_count = len(self.df)
-        self.df = merge_entities_by_lei(self.df, self.register_type)
-        final_count = len(self.df)
-
-        merged_count = initial_count - final_count
-        if merged_count > 0:
-            self.changes.append(Change(
-                type="DUPLICATE_LEI_MERGED",
-                row=0,  # Not specific to one row
-                column="",
-                old_value=f"{initial_count} rows",
-                new_value=f"{final_count} rows ({merged_count} merged)"
-            ))
-
     def fix_address_website_parsing(self) -> None:
         """Fix address/website parsing issues"""
         if 'ae_address' not in self.df.columns or 'ae_website' not in self.df.columns:

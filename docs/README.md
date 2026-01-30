@@ -8,6 +8,7 @@
 
 ## 🔧 Techniczna Dokumentacja (docs/)
 
+- [MiCA.pdf](MiCA.pdf) - Dokument regulacyjny MiCA (Markets in Crypto-Assets)
 - [CSV_VALIDATION.md](CSV_VALIDATION.md) - System walidacji CSV
 - [CSV_CLEANING.md](CSV_CLEANING.md) - Automatyczne czyszczenie danych
 - [LLM_REMEDIATION_DESIGN.md](LLM_REMEDIATION_DESIGN.md) - LLM-based data remediation
@@ -50,9 +51,9 @@ Poniżej nowe lokalizacje przeniesionych plików (dla odniesienia):
 ├── README.md                        # Główna dokumentacja
 ├── UPDATE_DATA.md                   # Workflow aktualizacji
 ├── IMPLEMENTATION_SUMMARY.md        # Podsumowanie implementacji
-├── MiCA.pdf                         # Dokument regulacyjny
 └── docs/
     ├── README.md                    # Ten plik - nawigacja
+    ├── MiCA.pdf                     # Dokument regulacyjny
     ├── CSV_VALIDATION.md            # Walidacja
     ├── CSV_CLEANING.md              # Czyszczenie
     ├── LLM_REMEDIATION_DESIGN.md    # LLM remediation

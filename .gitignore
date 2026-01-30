@@ -14,6 +14,7 @@ build/
 
 # Database
 *.db
+*.db.backup*
 *.sqlite
 *.sqlite3
 
