@@ -11,7 +11,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.database import SessionLocal, engine, Base
 from app.models import Entity, Service
-from app.routers.entities import apply_search_filter, MICA_SERVICE_SHORT_NAMES, MICA_SERVICE_MEDIUM_NAMES, MICA_SERVICE_DESCRIPTIONS, COUNTRY_NAMES
+from app.routers.entities import apply_search_filter
+from app.config.constants import MICA_SERVICE_SHORT_NAMES, MICA_SERVICE_MEDIUM_NAMES, MICA_SERVICE_DESCRIPTIONS, COUNTRY_NAMES
 
 def test_search_logic():
     """Test search matching logic"""

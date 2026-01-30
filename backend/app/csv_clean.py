@@ -20,12 +20,11 @@ from .import_csv import (
     fix_encoding_issues as fix_text_encoding,  # Rename to avoid conflict
     normalize_commercial_name,
     fix_address_website_parsing,
-    merge_entities_by_lei,  # Not used - kept for reference
     normalize_service_code,
-    MICA_SERVICE_DESCRIPTIONS,
     is_url,
     parse_pipe_separated,
 )
+from .config.constants import MICA_SERVICE_DESCRIPTIONS
 
 # Import register configuration
 from .config.registers import RegisterType, get_register_config
