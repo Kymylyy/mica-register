@@ -12,6 +12,7 @@ from .config.registers import (
     get_register_config, RegisterConfig,
     parse_yes_no, parse_true_false
 )
+from .config.constants import MICA_SERVICE_DESCRIPTIONS
 from typing import List, Optional
 
 # Initialize logger
@@ -93,21 +94,6 @@ def normalize_service_code(service_text: str) -> Optional[str]:
         return service_text.lower()
     
     return None
-
-
-# MiCA standard service descriptions
-MICA_SERVICE_DESCRIPTIONS = {
-    "a": "providing custody and administration of crypto-assets on behalf of clients",
-    "b": "operation of a trading platform for crypto-assets",
-    "c": "exchange of crypto-assets for funds",
-    "d": "exchange of crypto-assets for other crypto-assets",
-    "e": "execution of orders for crypto-assets on behalf of clients",
-    "f": "placing of crypto-assets",
-    "g": "reception and transmission of orders for crypto-assets on behalf of clients",
-    "h": "providing advice on crypto-assets",
-    "i": "providing portfolio management on crypto-assets",
-    "j": "providing transfer services for crypto-assets on behalf of clients"
-}
 
 
 def get_or_create_service(db: Session, service_code: str, service_cache: dict) -> Service:
@@ -289,131 +275,6 @@ def fix_address_website_parsing(row: pd.Series) -> tuple[Optional[str], Optional
     
     # Return None for empty strings, otherwise return as-is
     return (address if address else None, website if website else None)
-
-
-def merge_entities_by_lei(df: pd.DataFrame, register_type: RegisterType = RegisterType.CASP) -> pd.DataFrame:
-    """
-    [DEPRECATED - NOT USED]
-
-    This function is no longer called in the CSV pipeline.
-    All rows are preserved as-is, including those with duplicate LEI codes.
-    Kept for reference only.
-
-    Merge rows with the same LEI into single rows.
-    Combines register-specific fields and uses latest dates.
-
-    Args:
-        df: DataFrame with CSV data
-        register_type: Register type (affects which fields to merge)
-
-    Returns:
-        DataFrame with merged entities
-    """
-    import warnings
-    warnings.warn(
-        "merge_entities_by_lei() is deprecated and should not be called.",
-        DeprecationWarning,
-        stacklevel=2
-    )
-    return df  # Return unchanged - no merge
-
-    # Legacy merge logic retained for reference (inactive)
-    # Get register configuration
-    config = get_register_config(register_type)
-
-    # Group by LEI
-    grouped = df.groupby('ae_lei', dropna=False)
-
-    merged_rows = []
-    for lei, group in grouped:
-        if pd.isna(lei) or str(lei).strip() == "":
-            # Keep rows without LEI as-is (common in NCASP)
-            merged_rows.extend(group.to_dict('records'))
-            continue
-
-        # Get the first row as base
-        base_row = group.iloc[0].to_dict()
-
-        # === CASP-specific merging ===
-        if register_type == RegisterType.CASP:
-            # Collect all services from all rows
-            all_service_codes = set()
-            for _, row in group.iterrows():
-                service_texts = parse_pipe_separated(row.get('ac_serviceCode'))
-                for service_text in service_texts:
-                    normalized = normalize_service_code(service_text)
-                    if normalized:
-                        all_service_codes.add(normalized)
-            # Convert back to pipe-separated string format
-            base_row['ac_serviceCode'] = ' | '.join([f"{code}. {MICA_SERVICE_DESCRIPTIONS.get(code, '')}" for code in sorted(all_service_codes)])
-
-            # Collect all passport countries from all rows
-            all_passport_codes = set()
-            for _, row in group.iterrows():
-                passport_codes = parse_pipe_separated(row.get('ac_serviceCode_cou'))
-                for code in passport_codes:
-                    if code.strip():
-                        all_passport_codes.add(code.strip().upper())
-            base_row['ac_serviceCode_cou'] = '|'.join(sorted(all_passport_codes))
-
-        # === Merge websites (all registers) ===
-        websites = set()
-        for _, row in group.iterrows():
-            website = str(row.get('ae_website', '')).strip() if not pd.isna(row.get('ae_website')) else ''
-            if website and website not in ['', 'nan', 'None']:
-                # Handle multiple websites in one field (space or newline separated)
-                for w in website.replace('\n', ' ').split():
-                    w = w.strip()
-                    if w and w not in ['', 'nan', 'None']:
-                        websites.add(w)
-        if websites:
-            base_row['ae_website'] = ' '.join(sorted(websites))
-        else:
-            base_row['ae_website'] = base_row.get('ae_website', '')
-
-        # === Use latest dates ===
-        latest_auth_date = None
-        latest_update = None
-
-        # Date columns vary by register
-        auth_date_col = 'ac_authorisationNotificationDate' if register_type in [RegisterType.CASP, RegisterType.ART, RegisterType.EMT] else None
-        last_update_col = 'ac_lastupdate' if register_type == RegisterType.CASP else 'ae_lastupdate' if register_type == RegisterType.NCASP else 'wp_lastupdate'
-
-        for _, row in group.iterrows():
-            if auth_date_col:
-                auth_date = parse_date(row.get(auth_date_col), config.date_format)
-                if auth_date and (not latest_auth_date or auth_date > latest_auth_date):
-                    latest_auth_date = auth_date
-
-            last_update = parse_date(row.get(last_update_col), config.date_format)
-            if last_update and (not latest_update or last_update > latest_update):
-                latest_update = last_update
-
-        if latest_auth_date and auth_date_col:
-            base_row[auth_date_col] = latest_auth_date.strftime('%d/%m/%Y')
-        if latest_update:
-            base_row[last_update_col] = latest_update.strftime('%d/%m/%Y')
-
-        # === Use most complete data for other fields (prefer non-empty values) ===
-        common_fields = ['ae_competentAuthority', 'ae_homeMemberState', 'ae_lei_name', 'ae_commercial_name', 'ae_address']
-
-        # Add register-specific fields
-        if register_type == RegisterType.CASP:
-            common_fields.extend(['ae_website_platform', 'ac_comments'])
-        elif register_type == RegisterType.NCASP:
-            common_fields.extend(['ae_comments', 'ae_infrigment', 'ae_reason'])
-        elif register_type in [RegisterType.OTHER, RegisterType.ART, RegisterType.EMT]:
-            common_fields.extend(['wp_comments', 'wp_url'])
-
-        for _, row in group.iterrows():
-            for key in common_fields:
-                value = row.get(key)
-                if pd.notna(value) and str(value).strip() and (not base_row.get(key) or not str(base_row.get(key)).strip()):
-                    base_row[key] = value
-
-        merged_rows.append(base_row)
-
-    return pd.DataFrame(merged_rows)
 
 
 def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = RegisterType.CASP):
