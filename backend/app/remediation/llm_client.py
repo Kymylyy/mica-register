@@ -35,13 +35,15 @@ GEMINI_MODELS = [
     "gemini-2.5-flash-lite",  # Last resort (10 RPM, 250K TPM, 20 RPD)
 ]
 
-# Default API key (for development)
-DEFAULT_API_KEY = "AIzaSyDc9TfliEFxKwWxlm6b0Wcf7n86v-4DDFc"
-
-
 def get_api_key() -> str:
-    """Get Gemini API key from environment or use default"""
-    return os.getenv("GEMINI_API_KEY", DEFAULT_API_KEY)
+    """Get Gemini API key from environment variable"""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "GEMINI_API_KEY environment variable not set. "
+            "Please set it in your .env file or environment."
+        )
+    return api_key
 
 
 def build_prompt(task: RemediationTask) -> str:
