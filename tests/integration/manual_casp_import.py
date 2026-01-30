@@ -5,8 +5,8 @@ Test script to clean and import CASP data, then verify functionality.
 import sys
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add backend directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.csv_clean import CSVCleaner
 from app.import_csv import import_csv_to_db
