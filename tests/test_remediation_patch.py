@@ -50,10 +50,10 @@ def create_test_patch(task: RemediationTask) -> RemediationPatch:
         transformation_type=TransformationType.ENCODING_FIX,
         risk_level=RiskLevel.LOW
     )
-    
+
     return RemediationPatch(
         patch_id="test-patch-1",
-        model_name="gemini-3-flash",
+        model_name="deepseek-reasoner",
         tasks=[proposal]
     )
 
@@ -110,7 +110,7 @@ def test_patch_rejection_forbidden_column(tmp_path):
     
     patch = RemediationPatch(
         patch_id="test-patch-1",
-        model_name="gemini-3-flash",
+        model_name="deepseek-reasoner",
         tasks=[proposal]
     )
     

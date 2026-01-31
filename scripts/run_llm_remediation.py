@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI script to run LLM remediation using Gemini API.
+CLI script to run LLM remediation using Deepseek API.
 
 Usage:
     python scripts/run_llm_remediation.py <tasks.json> [--out patch.json] [--api-key KEY]
@@ -15,16 +15,16 @@ from pathlib import Path
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
-from app.remediation.llm_client import GeminiLLMClient
+from app.remediation.llm_client import LLMClient
 from app.remediation.schemas import RemediationTask
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run LLM remediation using Gemini API",
+        description="Run LLM remediation using Deepseek API",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    
+
     parser.add_argument(
         "tasks_file",
         type=Path,
@@ -38,16 +38,16 @@ def main() -> int:
     parser.add_argument(
         "--api-key",
         type=str,
-        help="Gemini API key (default: from GEMINI_API_KEY env var)"
+        help="Deepseek API key (default: from DEEPSEEK_API_KEY env var)"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Validate inputs
     if not args.tasks_file.exists():
         print(f"Error: Tasks file not found: {args.tasks_file}", file=sys.stderr)
         return 1
-    
+
     # Load tasks
     try:
         with open(args.tasks_file, 'r', encoding='utf-8') as f:
@@ -55,24 +55,24 @@ def main() -> int:
     except Exception as e:
         print(f"Error loading tasks: {e}", file=sys.stderr)
         return 1
-    
+
     tasks_list = tasks_data.get("tasks", [])
     if not tasks_list:
         print("No tasks found in file.", file=sys.stderr)
         return 1
-    
+
     # Parse tasks
     tasks = [RemediationTask(**task) for task in tasks_list]
-    
-    print(f"Processing {len(tasks)} tasks with Gemini API...")
-    
+
+    print(f"Processing {len(tasks)} tasks with Deepseek API...")
+
     # Initialize client
-    api_key = args.api_key or os.getenv("GEMINI_API_KEY")
+    api_key = args.api_key or os.getenv("DEEPSEEK_API_KEY")
     if not api_key:
-        print("Error: API key not provided. Use --api-key or set GEMINI_API_KEY env var.", file=sys.stderr)
+        print("Error: API key not provided. Use --api-key or set DEEPSEEK_API_KEY env var.", file=sys.stderr)
         return 1
-    
-    client = GeminiLLMClient(api_key=api_key)
+
+    client = LLMClient(api_key=api_key)
     
     # Generate patch
     try:

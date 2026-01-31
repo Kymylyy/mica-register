@@ -121,11 +121,11 @@ class RemediationPatch(BaseModel):
     """Patch with LLM proposals"""
     patch_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     generated_at: datetime = Field(default_factory=datetime.utcnow)
-    model_provider: str = "gemini"
+    model_provider: str = "deepseek"
     model_name: str
     tasks: List[PatchProposal] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    
+
     class Config:
         use_enum_values = True
 
