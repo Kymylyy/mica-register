@@ -27,6 +27,12 @@ const COMMON_COLUMNS = [
     visible: false,
   },
   {
+    id: 'lei_cou_code',
+    label: 'LEI Country',
+    description: 'LEI country code',
+    visible: false,
+  },
+  {
     id: 'home_member_state',
     label: 'Country',
     description: 'Home member state',
@@ -37,12 +43,6 @@ const COMMON_COLUMNS = [
     label: 'Authority',
     description: 'Competent authority',
     visible: false,
-  },
-  {
-    id: 'authorisation_notification_date',
-    label: 'Auth. Date',
-    description: 'Authorization/notification date',
-    visible: true,
   },
   {
     id: 'address',
@@ -79,6 +79,12 @@ const COMMON_COLUMNS = [
  */
 const CASP_SPECIFIC_COLUMNS = [
   {
+    id: 'authorisation_notification_date',
+    label: 'Auth. Date',
+    description: 'Authorization/notification date',
+    visible: true,
+  },
+  {
     id: 'services',
     label: 'Services',
     description: 'Crypto-asset services provided (a-j)',
@@ -97,6 +103,13 @@ const CASP_SPECIFIC_COLUMNS = [
     label: 'End Date',
     description: 'Authorization end date',
     visible: false,
+  },
+  {
+    id: 'website_platform',
+    label: 'Platform',
+    description: 'Website platform',
+    visible: false,
+    size: 200,
   },
 ];
 
@@ -155,6 +168,12 @@ const OTHER_SPECIFIC_COLUMNS = [
  */
 const ART_SPECIFIC_COLUMNS = [
   {
+    id: 'authorisation_notification_date',
+    label: 'Auth. Date',
+    description: 'Authorization/notification date',
+    visible: true,
+  },
+  {
     id: 'credit_institution',
     label: 'Credit Institution',
     description: 'Whether issuer is a credit institution',
@@ -180,6 +199,12 @@ const ART_SPECIFIC_COLUMNS = [
     visible: false,
   },
   {
+    id: 'white_paper_notification_date',
+    label: 'WP Auth. Date',
+    description: 'White paper authorization/notification date',
+    visible: false,
+  },
+  {
     id: 'white_paper_comments',
     label: 'WP Comments',
     description: 'White paper comments',
@@ -193,10 +218,28 @@ const ART_SPECIFIC_COLUMNS = [
  */
 const EMT_SPECIFIC_COLUMNS = [
   {
+    id: 'authorisation_notification_date',
+    label: 'Entity Auth. Date',
+    description: 'Entity authorization/notification date',
+    visible: false,  // Hidden by default for EMT (white paper date is more relevant)
+  },
+  {
     id: 'authorisation_other_emt',
     label: 'Institution Type',
     description: 'Type of authorisation (credit institution, etc.)',
     visible: true,
+  },
+  {
+    id: 'exemption_48_4',
+    label: 'Exemption 48(4)',
+    description: 'Exemption under Article 48(4)',
+    visible: false,
+  },
+  {
+    id: 'exemption_48_5',
+    label: 'Exemption 48(5)',
+    description: 'Exemption under Article 48(5)',
+    visible: false,
   },
   {
     id: 'white_paper_notification_date',
@@ -283,14 +326,13 @@ export function getRegisterColumns(registerType) {
       return [...baseColumns, ...CASP_SPECIFIC_COLUMNS];
 
     case 'other':
-      // OTHER doesn't have commercial_name in CSV, so filter it out
+      // OTHER doesn't have commercial_name, website, comments, or address in CSV
       // Custom column order: WHITE PAPER / LEI NAME / COUNTRY / LAST UPDATE
       const otherCommon = baseColumns
-        .filter(col => col.id !== 'commercial_name')
+        .filter(col => !['commercial_name', 'website', 'comments', 'address'].includes(col.id))
         .map(col => {
           if (col.id === 'lei_name') return {...col, visible: true};
           if (col.id === 'last_update') return {...col, visible: true};
-          if (col.id === 'authorisation_notification_date') return {...col, visible: false};
           return col;
         });
 
@@ -328,12 +370,8 @@ export function getRegisterColumns(registerType) {
       return [...baseColumns, ...ART_SPECIFIC_COLUMNS];
 
     case 'emt':
-      // CRITICAL: Hide entity auth date, otherwise it remains visible from COMMON_COLUMNS
-      // Also change "Commercial Name" to "Issuer" for EMT
+      // Change "Commercial Name" to "Issuer" for EMT
       const emtCommon = baseColumns.map(col => {
-        if (col.id === 'authorisation_notification_date') {
-          return {...col, visible: false};  // Hide entity auth date (ac_authorisationNotificationDate)
-        }
         if (col.id === 'commercial_name') {
           return {...col, label: 'Issuer'};  // Change label to "Issuer" for EMT
         }
@@ -342,7 +380,9 @@ export function getRegisterColumns(registerType) {
       return [...emtCommon, ...EMT_SPECIFIC_COLUMNS];
 
     case 'ncasp':
-      return [...baseColumns, ...NCASP_SPECIFIC_COLUMNS];
+      // NCASP doesn't have address in CSV
+      const ncaspCommon = baseColumns.filter(col => col.id !== 'address');
+      return [...ncaspCommon, ...NCASP_SPECIFIC_COLUMNS];
 
     default:
       console.warn(`Unknown register type: ${registerType}, defaulting to CASP`);
