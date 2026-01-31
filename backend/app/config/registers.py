@@ -65,7 +65,7 @@ OTHER_COLUMNS = {
     'ae_lei_name_casp': 'lei_name_casp',  # OTHER-specific: linked CASP name
     'ae_lei_casp': 'lei_casp',  # OTHER-specific: linked CASP LEI
     'ae_offerCode_cou': 'offer_countries',  # Pipe-separated
-    'ae_DTI_FFG': 'dti_ffg',  # Boolean
+    'ae_DTI_FFG': 'dti_ffg',  # DTI FFG code (string)
     'ae_DTI': 'dti_codes',  # Pipe-separated
     'wp_url': 'white_paper_url',
     'wp_comments': 'white_paper_comments',
@@ -97,7 +97,7 @@ EMT_COLUMNS = {
     'ae_exemption48_4': 'exemption_48_4',  # EMT-specific: boolean (YES/NO)
     'ae_exemption48_5': 'exemption_48_5',  # EMT-specific: boolean
     'ae_authorisation_other_emt': 'authorisation_other_emt',  # EMT-specific: text
-    'ae_DTI_FFG': 'dti_ffg',  # Boolean
+    'ae_DTI_FFG': 'dti_ffg',  # DTI FFG code (string)
     'ae_DTI': 'dti_codes',  # Pipe-separated
     'wp_url': 'white_paper_url',
     'wp_authorisationNotificationDate': 'white_paper_notification_date',
@@ -207,7 +207,7 @@ REGISTERS = {
             'dti_codes': '|',
         },
         boolean_fields={
-            'dti_ffg': parse_yes_no,
+            # Note: dti_ffg is NOT a boolean, it's a DTI code string
         },
     ),
 
@@ -241,7 +241,7 @@ REGISTERS = {
         boolean_fields={
             'exemption_48_4': parse_yes_no,
             'exemption_48_5': parse_yes_no,
-            'dti_ffg': parse_yes_no,
+            # Note: dti_ffg is NOT a boolean, it's a DTI code string
         },
     ),
 
@@ -256,9 +256,7 @@ REGISTERS = {
         multi_value_fields={
             'websites': '|',  # Multiple websites separated by |
         },
-        boolean_fields={
-            'infringement': parse_yes_no,
-        },
+        boolean_fields={},  # infringement is String ("No" or description), not Boolean
     ),
 }
 

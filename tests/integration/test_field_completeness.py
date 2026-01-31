@@ -157,9 +157,9 @@ def _is_date_field(api_field: str, csv_col: str) -> bool:
 def _is_boolean_field(api_field: str, register_type: RegisterType) -> bool:
     """Check if field is a boolean field"""
     # Note: infringement in NCASP is stored as String in DB, not Boolean
+    # Note: dti_ffg is String, not Boolean
     boolean_fields = {
-        'dti_ffg', 'credit_institution', 'exemption_48_4', 'exemption_48_5',
-        'passporting'
+        'credit_institution', 'exemption_48_4', 'exemption_48_5'
     }
     return api_field in boolean_fields
 
@@ -271,8 +271,7 @@ def test_casp_specific_fields_in_api(client, db_with_casp_data):
         'services',
         'passport_countries',
         'website_platform',
-        'authorisation_end_date',
-        'passporting'
+        'authorisation_end_date'
     ]
 
     for field in casp_fields:

@@ -24,7 +24,7 @@ class TestEntityBaseModel:
             lei="5299001HFNLCLQMF3X50",
             commercial_name="Test CASP",
             home_member_state="DE",
-            authorisation_date=date(2025, 1, 15)
+            authorisation_notification_date=date(2025, 1, 15)
         )
         db_session.add(entity)
         db_session.commit()
@@ -40,7 +40,7 @@ class TestEntityBaseModel:
             competent_authority="AMF",
             lei_name="Company Without LEI",
             home_member_state="FR",
-            authorisation_date=date(2024, 6, 1)
+            authorisation_notification_date=date(2024, 6, 1)
         )
         db_session.add(entity)
         db_session.commit()
@@ -60,24 +60,23 @@ class TestCaspEntityModel:
             lei="5299001HFNLCLQMF3X50",
             commercial_name="Test CASP",
             home_member_state="DE",
-            authorisation_date=date(2025, 1, 15)
+            authorisation_notification_date=date(2025, 1, 15)
         )
 
         casp_entity = CaspEntity(
             entity=entity,
-            passporting=True,
             website_platform="https://test-casp.de"
         )
 
         service = Service(
-            casp_entity=casp_entity,
             code="a",
-            description="Providing custody and administration"
+            description="Providing custody and administration of crypto-assets on behalf of clients"
         )
 
         db_session.add(entity)
         db_session.add(casp_entity)
-        db_session.add(service)
+        db_session.flush()
+        casp_entity.services.append(service)
         db_session.commit()
 
         # Test relationships
@@ -93,7 +92,7 @@ class TestCaspEntityModel:
             lei="5299001HFNLCLQMF3X50",
             commercial_name="Test CASP",
             home_member_state="DE",
-            authorisation_date=date(2025, 1, 15)
+            authorisation_notification_date=date(2025, 1, 15)
         )
 
         casp_entity = CaspEntity(
@@ -116,23 +115,22 @@ class TestCaspEntityModel:
             lei="5299001HFNLCLQMF3X50",
             commercial_name="Test CASP",
             home_member_state="DE",
-            authorisation_date=date(2025, 1, 15)
+            authorisation_notification_date=date(2025, 1, 15)
         )
 
         casp_entity = CaspEntity(
-            entity=entity,
-            passporting=True
+            entity=entity
         )
 
-        countries = [
-            PassportCountry(casp_entity=casp_entity, country_code="BE"),
-            PassportCountry(casp_entity=casp_entity, country_code="FR"),
-            PassportCountry(casp_entity=casp_entity, country_code="NL")
-        ]
+        be = PassportCountry(country_code="BE")
+        fr = PassportCountry(country_code="FR")
+        nl = PassportCountry(country_code="NL")
 
         db_session.add(entity)
         db_session.add(casp_entity)
-        db_session.add_all(countries)
+        db_session.add_all([be, fr, nl])
+        db_session.flush()
+        casp_entity.passport_countries.extend([be, fr, nl])
         db_session.commit()
 
         # Test relationships
@@ -148,7 +146,7 @@ class TestCaspEntityModel:
             lei="5299001HFNLCLQMF3X50",
             commercial_name="Test CASP",
             home_member_state="DE",
-            authorisation_date=date(2025, 1, 15)
+            authorisation_notification_date=date(2025, 1, 15)
         )
 
         casp_entity = CaspEntity(
@@ -174,7 +172,7 @@ class TestOtherEntityModel:
             competent_authority="BaFin",
             lei_name="Tether Operations",
             home_member_state="DE",
-            authorisation_date=date(2025, 1, 15)
+            authorisation_notification_date=date(2025, 1, 15)
         )
 
         other_entity = OtherEntity(
@@ -183,7 +181,7 @@ class TestOtherEntityModel:
             lei_name_casp="Binance Europe Services Ltd.",
             white_paper_url="https://tether.to/wp.pdf",
             offer_countries="DE|FR|IT",
-            dti_ffg=True,
+            dti_ffg="YES",
             dti_codes="DTI-001|DTI-002"
         )
 
@@ -193,7 +191,7 @@ class TestOtherEntityModel:
 
         assert entity.other_entity is not None
         assert entity.other_entity.lei_casp == "5299001HFNLCLQMF3X50"
-        assert entity.other_entity.dti_ffg is True
+        assert entity.other_entity.dti_ffg == "YES"
 
     def test_other_entity_properties(self, db_session):
         """Test OTHER entity properties accessible through Entity"""
@@ -207,7 +205,7 @@ class TestOtherEntityModel:
         other_entity = OtherEntity(
             entity=entity,
             white_paper_url="https://circle.com/usdc",
-            dti_ffg=False
+            dti_ffg="NO"
         )
 
         db_session.add(entity)
@@ -215,7 +213,7 @@ class TestOtherEntityModel:
         db_session.commit()
 
         assert entity.white_paper_url == "https://circle.com/usdc"
-        assert entity.dti_ffg is False
+        assert entity.dti_ffg == "NO"
 
 
 class TestArtEntityModel:
@@ -229,7 +227,7 @@ class TestArtEntityModel:
             lei="5299001HFNLCLQMF3X50",
             commercial_name="Binance EUR Stablecoin",
             home_member_state="DE",
-            authorisation_date=date(2025, 1, 15)
+            authorisation_notification_date=date(2025, 1, 15)
         )
 
         art_entity = ArtEntity(
@@ -258,7 +256,7 @@ class TestEmtEntityModel:
             lei="5299001HFNLCLQMF3X50",
             commercial_name="German E-Money Token",
             home_member_state="DE",
-            authorisation_date=date(2025, 1, 15)
+            authorisation_notification_date=date(2025, 1, 15)
         )
 
         emt_entity = EmtEntity(
@@ -267,7 +265,7 @@ class TestEmtEntityModel:
             exemption_48_5=False,
             authorisation_other_emt="Credit institution under CRD",
             white_paper_notification_date=date(2024, 12, 15),
-            dti_ffg=True,
+            dti_ffg="YES",
             dti_codes="EMT-001|EMT-002"
         )
 
@@ -295,7 +293,7 @@ class TestNcaspEntityModel:
         ncasp_entity = NcaspEntity(
             entity=entity,
             websites="https://scam.de|https://scam.com",
-            infringement=True,
+            infringement="YES",
             reason="Unauthorized crypto-asset services provision",
             decision_date=date(2025, 1, 15)
         )
@@ -304,7 +302,7 @@ class TestNcaspEntityModel:
         db_session.add(ncasp_entity)
         db_session.commit()
 
-        assert entity.infringement is True
+        assert entity.infringement == "YES"
         assert entity.reason == "Unauthorized crypto-asset services provision"
         assert entity.decision_date == date(2025, 1, 15)
         assert "scam.de" in entity.websites
@@ -321,7 +319,7 @@ class TestNcaspEntityModel:
         ncasp_entity = NcaspEntity(
             entity=entity,
             websites="https://fake.fr",
-            infringement=True,
+            infringement="YES",
             reason="Operating without authorization"
         )
 
@@ -331,4 +329,4 @@ class TestNcaspEntityModel:
 
         assert entity.lei is None
         assert entity.commercial_name == "Fake Exchange"
-        assert entity.infringement is True
+        assert entity.infringement == "YES"

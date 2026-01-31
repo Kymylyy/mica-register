@@ -214,8 +214,8 @@ def validate_country_code(code: str) -> bool:
 
     if HAS_PYCOUNTRY:
         try:
-            pycountry.countries.get(alpha_2=code)
-            return True
+            result = pycountry.countries.get(alpha_2=code)
+            return result is not None
         except (KeyError, AttributeError):
             return False
     else:

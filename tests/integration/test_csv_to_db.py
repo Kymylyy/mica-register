@@ -174,13 +174,13 @@ class TestOtherCsvImport:
         entity_yes = db_session.query(Entity).filter(
             Entity.lei_name == "Tether Operations Limited"
         ).first()
-        assert entity_yes.other_entity.dti_ffg is True
+        assert entity_yes.other_entity.dti_ffg == "YES"
 
         # Entity with DTI/FFG = NO
         entity_no = db_session.query(Entity).filter(
             Entity.lei_name == "Circle Internet Financial"
         ).first()
-        assert entity_no.other_entity.dti_ffg is False
+        assert entity_no.other_entity.dti_ffg == "NO" or entity_no.other_entity.dti_ffg == ""
 
     def test_other_without_lei(self, db_session, other_sample_csv):
         """Verify OTHER entities without LEI are imported (common case)"""
@@ -332,7 +332,7 @@ class TestEmtCsvImport:
         ).first()
 
         assert entity is not None
-        assert entity.emt_entity.dti_ffg is True
+        assert entity.emt_entity.dti_ffg == "YES"
         assert entity.emt_entity.dti_codes is not None
         assert "EMT-001" in entity.emt_entity.dti_codes
 
