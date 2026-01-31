@@ -44,26 +44,35 @@ def test_build_prompt():
 @patch('backend.app.remediation.llm_client.genai')
 def test_gemini_client_fallback(mock_genai):
     """Test that client falls back to next model if first fails"""
-    # Mock first model to fail
-    mock_model1 = Mock()
-    mock_model1.generate_content.side_effect = Exception("Model not available")
-    
-    # Mock second model to succeed
-    mock_model2 = Mock()
+    # Mock client and models
+    mock_client = Mock()
+    mock_models = Mock()
+    mock_client.models = mock_models
+
+    # First call fails, second succeeds
     mock_response = Mock()
-    mock_response.text = '{"proposed_value": "Test Address", "confidence": 0.95, "reasoning": "Fixed", "transformation_type": "ENCODING_FIX", "risk_level": "LOW"}'
-    mock_model2.generate_content.return_value = mock_response
-    
-    mock_genai.GenerativeModel.side_effect = [mock_model1, mock_model2]
-    mock_genai.configure = Mock()
-    
+    mock_candidate = Mock()
+    mock_content = Mock()
+    mock_part = Mock()
+    mock_part.text = '{"proposed_value": "Test Address", "confidence": 0.95, "reasoning": "Fixed", "transformation_type": "ENCODING_FIX", "risk_level": "LOW"}'
+    mock_content.parts = [mock_part]
+    mock_candidate.content = mock_content
+    mock_response.candidates = [mock_candidate]
+
+    mock_models.generate_content.side_effect = [
+        Exception("Model not available"),  # First model fails
+        mock_response  # Second model succeeds
+    ]
+
+    mock_genai.Client.return_value = mock_client
+
     client = GeminiLLMClient(api_key="test-key")
     task = create_test_task()
-    
+
     patch_result = client.generate_patch([task])
-    
+
     # Should use second model after first fails
-    assert patch_result.model_name in ["gemini-2-5-flash", "gemini-2.5-flash-lite"]
+    assert patch_result.model_name in ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
     assert len(patch_result.tasks) == 1
     assert patch_result.tasks[0].proposed_value == "Test Address"
 
@@ -71,20 +80,28 @@ def test_gemini_client_fallback(mock_genai):
 @patch('backend.app.remediation.llm_client.genai')
 def test_gemini_client_success(mock_genai):
     """Test successful patch generation"""
-    mock_model = Mock()
+    mock_client = Mock()
+    mock_models = Mock()
+    mock_client.models = mock_models
+
     mock_response = Mock()
-    mock_response.text = '{"proposed_value": "Test Address", "confidence": 0.95, "reasoning": "Fixed encoding", "transformation_type": "ENCODING_FIX", "risk_level": "LOW"}'
-    mock_model.generate_content.return_value = mock_response
-    
-    mock_genai.GenerativeModel.return_value = mock_model
-    mock_genai.configure = Mock()
-    
+    mock_candidate = Mock()
+    mock_content = Mock()
+    mock_part = Mock()
+    mock_part.text = '{"proposed_value": "Test Address", "confidence": 0.95, "reasoning": "Fixed encoding", "transformation_type": "ENCODING_FIX", "risk_level": "LOW"}'
+    mock_content.parts = [mock_part]
+    mock_candidate.content = mock_content
+    mock_response.candidates = [mock_candidate]
+    mock_models.generate_content.return_value = mock_response
+
+    mock_genai.Client.return_value = mock_client
+
     client = GeminiLLMClient(api_key="test-key")
     task = create_test_task()
-    
+
     patch_result = client.generate_patch([task])
-    
-    assert patch_result.model_name == "gemini-3-flash"
+
+    assert patch_result.model_name == "gemini-3-flash-preview"
     assert len(patch_result.tasks) == 1
     assert patch_result.tasks[0].confidence == 0.95
     assert patch_result.tasks[0].proposed_value == "Test Address"
@@ -114,19 +131,27 @@ def test_gemini_client_all_models_fail(mock_genai):
 @patch('backend.app.remediation.llm_client.genai')
 def test_gemini_client_json_parsing_with_markdown(mock_genai):
     """Test that JSON parsing handles markdown code blocks"""
-    mock_model = Mock()
+    mock_client = Mock()
+    mock_models = Mock()
+    mock_client.models = mock_models
+
     mock_response = Mock()
-    mock_response.text = '```json\n{"proposed_value": "Test Address", "confidence": 0.95, "reasoning": "Fixed", "transformation_type": "ENCODING_FIX", "risk_level": "LOW"}\n```'
-    mock_model.generate_content.return_value = mock_response
-    
-    mock_genai.GenerativeModel.return_value = mock_model
-    mock_genai.configure = Mock()
-    
+    mock_candidate = Mock()
+    mock_content = Mock()
+    mock_part = Mock()
+    mock_part.text = '```json\n{"proposed_value": "Test Address", "confidence": 0.95, "reasoning": "Fixed", "transformation_type": "ENCODING_FIX", "risk_level": "LOW"}\n```'
+    mock_content.parts = [mock_part]
+    mock_candidate.content = mock_content
+    mock_response.candidates = [mock_candidate]
+    mock_models.generate_content.return_value = mock_response
+
+    mock_genai.Client.return_value = mock_client
+
     client = GeminiLLMClient(api_key="test-key")
     task = create_test_task()
-    
+
     patch_result = client.generate_patch([task])
-    
+
     assert len(patch_result.tasks) == 1
     assert patch_result.tasks[0].proposed_value == "Test Address"
 

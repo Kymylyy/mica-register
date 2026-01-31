@@ -30,14 +30,13 @@ class TestCaspApiSchema:
         assert "lei" in entity
         assert "commercial_name" in entity
         assert "home_member_state" in entity
-        assert "authorisation_date" in entity
+        assert "authorisation_notification_date" in entity
         assert "register_type" in entity
 
         # CASP-specific fields
         assert "services" in entity
         assert "passport_countries" in entity
         assert "website_platform" in entity
-        assert "passporting" in entity
 
     def test_casp_services_structure(self, client, db_with_casp_data):
         """Verify services are returned as list of objects"""
@@ -59,9 +58,9 @@ class TestCaspApiSchema:
         response = client.get("/api/entities?register_type=casp&limit=10")
         assert response.status_code == 200
 
-        # Find an entity with passporting
+        # Find an entity with passport countries
         entities = response.json()["items"]
-        passporting_entity = next((e for e in entities if e.get("passporting") is True), None)
+        passporting_entity = next((e for e in entities if len(e.get("passport_countries", [])) > 0), None)
 
         assert passporting_entity is not None
         assert "passport_countries" in passporting_entity
@@ -78,11 +77,11 @@ class TestCaspApiSchema:
 
         entity = response.json()["items"][0]
 
-        # authorisation_date should be ISO format (YYYY-MM-DD)
-        assert "authorisation_date" in entity
-        if entity["authorisation_date"]:
+        # authorisation_notification_date should be ISO format (YYYY-MM-DD)
+        assert "authorisation_notification_date" in entity
+        if entity["authorisation_notification_date"]:
             # Should be parseable as ISO date
-            date_str = entity["authorisation_date"]
+            date_str = entity["authorisation_notification_date"]
             assert "-" in date_str  # ISO format uses hyphens
             # Verify it's a valid date
             date.fromisoformat(date_str)
@@ -134,7 +133,9 @@ class TestOtherApiSchema:
         # Find entity with dti_ffg
         entity_with_dti = next((e for e in entities if e.get("dti_ffg") is not None), None)
         assert entity_with_dti is not None
-        assert isinstance(entity_with_dti["dti_ffg"], bool)
+        assert isinstance(entity_with_dti["dti_ffg"], str) or entity_with_dti["dti_ffg"] is None
+        if entity_with_dti["dti_ffg"]:
+            assert entity_with_dti["dti_ffg"] in ["YES", "NO"]
 
     def test_other_pipe_separated_values(self, client, db_with_other_data):
         """Verify pipe-separated values are in response"""
@@ -165,7 +166,7 @@ class TestArtApiSchema:
         assert "lei" in entity
         assert "commercial_name" in entity
         assert "home_member_state" in entity
-        assert "authorisation_date" in entity
+        assert "authorisation_notification_date" in entity
 
         # ART-specific fields
         assert "credit_institution" in entity
@@ -202,7 +203,7 @@ class TestEmtApiSchema:
         assert "lei" in entity
         assert "commercial_name" in entity
         assert "home_member_state" in entity
-        assert "authorisation_date" in entity
+        assert "authorisation_notification_date" in entity
 
         # EMT-specific fields
         assert "exemption_48_4" in entity
@@ -276,7 +277,9 @@ class TestNcaspApiSchema:
 
         entity = next((e for e in entities if e.get("infringement") is not None), None)
         assert entity is not None
-        assert isinstance(entity["infringement"], bool)
+        assert isinstance(entity["infringement"], str) or entity["infringement"] is None
+        if entity["infringement"]:
+            assert entity["infringement"] == "YES"
 
     def test_ncasp_multiple_websites(self, client, db_with_ncasp_data):
         """Verify websites field contains pipe-separated values"""
