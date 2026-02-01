@@ -59,8 +59,10 @@ class Entity(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # Register type (CASP, OTHER, ART, EMT, NCASP)
+    # Use values_callable to send lowercase values ('casp') to PostgreSQL
+    # instead of uppercase enum names ('CASP')
     register_type = Column(
-        SQLEnum(RegisterType),
+        SQLEnum(RegisterType, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         index=True,
         default=RegisterType.CASP
