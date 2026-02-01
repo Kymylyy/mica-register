@@ -171,8 +171,16 @@ def run_migration():
                 conn.commit()
                 logger.info("  ✅ Created composite index on (register_type, lei)")
 
-                # Recreate simple index on lei (for lookups)
-                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_entities_lei ON entities(lei)"))
+                # Drop old unique index on lei (if exists) before recreating as non-unique
+                try:
+                    conn.execute(text("DROP INDEX IF EXISTS ix_entities_lei"))
+                    conn.commit()
+                    logger.info("  ✅ Dropped old unique index ix_entities_lei")
+                except Exception as e:
+                    logger.warning(f"  ⚠️  Could not drop old index: {e}")
+
+                # Recreate simple (non-unique) index on lei for lookups
+                conn.execute(text("CREATE INDEX ix_entities_lei ON entities(lei)"))
                 conn.commit()
                 logger.info("  ✅ Recreated simple index on lei")
 
