@@ -480,8 +480,8 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
             offer_countries = '|'.join(parse_pipe_separated(row.get('ae_offerCode_cou')))
             dti_codes = '|'.join(parse_pipe_separated(row.get('ae_DTI')))
 
-            # Parse boolean
-            dti_ffg = parse_yes_no(row.get('ae_DTI_FFG')) if not pd.isna(row.get('ae_DTI_FFG')) else None
+            # DTI FFG is a string code (identifier), not a boolean
+            dti_ffg = str(row.get('ae_DTI_FFG', '')).strip() if not pd.isna(row.get('ae_DTI_FFG')) else None
 
             # Create OtherEntity extension
             other_entity = OtherEntity(
@@ -526,7 +526,8 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
             exemption_48_4 = parse_yes_no(row.get('ae_exemption48_4')) if not pd.isna(row.get('ae_exemption48_4')) else None
             exemption_48_5 = parse_yes_no(row.get('ae_exemption48_5')) if not pd.isna(row.get('ae_exemption48_5')) else None
             authorisation_other_emt = str(row.get('ae_authorisation_other_emt', '')).strip() if not pd.isna(row.get('ae_authorisation_other_emt')) else None
-            dti_ffg = parse_yes_no(row.get('ae_DTI_FFG')) if not pd.isna(row.get('ae_DTI_FFG')) else None
+            # DTI FFG is a string code (identifier), not a boolean
+            dti_ffg = str(row.get('ae_DTI_FFG', '')).strip() if not pd.isna(row.get('ae_DTI_FFG')) else None
             dti_codes = '|'.join(parse_pipe_separated(row.get('ae_DTI')))
             white_paper_url = str(row.get('wp_url', '')).strip() if not pd.isna(row.get('wp_url')) else None
             white_paper_notification_date = parse_date(row.get('wp_authorisationNotificationDate'), config.date_format)

@@ -7,7 +7,7 @@ from ..database import get_db, engine, Base
 from ..models import (
     Entity, Service, PassportCountry, EntityTag,
     entity_service, casp_entity_service,  # Legacy and new association tables
-    CaspEntity
+    CaspEntity, OtherEntity, ArtEntity, EmtEntity, NcaspEntity
 )
 from ..schemas import Entity as EntitySchema, EntityTag as EntityTagSchema, TagCreate, EntityUpdate, PaginatedResponse
 from ..config.registers import RegisterType
@@ -21,7 +21,7 @@ from ..config.constants import (
 router = APIRouter()
 
 def apply_search_filter(query, search: str, register_type: RegisterType = RegisterType.CASP):
-    """Apply search filter: commercial name, LEI name, country names, and service names (CASP only)
+    """Apply search filter: commercial name, LEI name, address, website, authority, comments, country names, and service names (CASP only)
 
     Args:
         query: SQLAlchemy query object
@@ -34,10 +34,14 @@ def apply_search_filter(query, search: str, register_type: RegisterType = Regist
     search_lower = search.lower().strip()
     search_original = search.strip()
 
-    # Build search conditions - search both commercial_name AND lei_name
+    # Build search conditions - search common Entity fields
     search_conditions = [
         Entity.commercial_name.ilike(f"%{search_original}%"),
         Entity.lei_name.ilike(f"%{search_original}%"),
+        Entity.address.ilike(f"%{search_original}%"),
+        Entity.website.ilike(f"%{search_original}%"),
+        Entity.competent_authority.ilike(f"%{search_original}%"),
+        Entity.comments.ilike(f"%{search_original}%"),
     ]
 
     # Check if search term matches any country name (e.g., "Germany" -> "DE")
@@ -87,6 +91,42 @@ def apply_search_filter(query, search: str, register_type: RegisterType = Regist
                 )
             )
             search_conditions.append(service_exists)
+
+    # Add register-specific field searches
+    # Search in white_paper_url for OTHER, ART, EMT registers
+    if register_type == RegisterType.OTHER:
+        white_paper_exists = exists().where(
+            and_(
+                OtherEntity.id == Entity.id,
+                OtherEntity.white_paper_url.ilike(f"%{search_original}%")
+            )
+        )
+        search_conditions.append(white_paper_exists)
+    elif register_type == RegisterType.ART:
+        white_paper_exists = exists().where(
+            and_(
+                ArtEntity.id == Entity.id,
+                ArtEntity.white_paper_url.ilike(f"%{search_original}%")
+            )
+        )
+        search_conditions.append(white_paper_exists)
+    elif register_type == RegisterType.EMT:
+        white_paper_exists = exists().where(
+            and_(
+                EmtEntity.id == Entity.id,
+                EmtEntity.white_paper_url.ilike(f"%{search_original}%")
+            )
+        )
+        search_conditions.append(white_paper_exists)
+    elif register_type == RegisterType.NCASP:
+        # Search in multiple websites (pipe-separated)
+        websites_exists = exists().where(
+            and_(
+                NcaspEntity.id == Entity.id,
+                NcaspEntity.websites.ilike(f"%{search_original}%")
+            )
+        )
+        search_conditions.append(websites_exists)
 
     # Combine all search conditions with OR
     search_filter = or_(*search_conditions)
@@ -478,14 +518,17 @@ def update_entity(
 
 @router.post("/admin/import")
 def import_data(db: Session = Depends(get_db)):
-    """Import CSV data into database (admin endpoint)
+    """Import CSV data for CASP register into database (admin endpoint)
 
-    Automatically finds the newest *_clean.csv file in data/cleaned/ directory
-    based on date in filename (YYYYMMDD), not file modification time.
+    Automatically finds the newest CASP *_clean.csv file in data/cleaned/casp/
+    directory based on date in filename (YYYYMMDD), not file modification time.
     Works both in Docker container and local development.
 
-    Note: This endpoint currently imports CASP register only.
-    For multi-register imports, use the import_all_registers.py script.
+    Note: This endpoint imports CASP register only.
+    For importing all 5 registers, use POST /api/admin/import-all instead.
+
+    Returns:
+        dict: Import summary with CASP entity count
     """
     import os
     from pathlib import Path
@@ -546,6 +589,91 @@ def import_data(db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=500,
             detail=f"Error importing data: {str(e)}"
+        )
+
+
+@router.post("/admin/import-all")
+def import_all_registers(db: Session = Depends(get_db)):
+    """Import CSV data for ALL registers into database (admin endpoint)
+
+    Automatically finds the newest *_clean.csv file in data/cleaned/{register}/
+    directory for each of the 5 ESMA MiCA registers (CASP, OTHER, ART, EMT, NCASP).
+
+    This is the recommended endpoint for production data imports.
+    For CASP-only import, use /api/admin/import instead.
+
+    Returns:
+        dict: Import summary with counts per register
+    """
+    import logging
+    from pathlib import Path
+    from ..import_csv import import_csv_to_db
+    from ..models import RegisterType, Entity
+    from ..utils.file_utils import get_latest_csv_for_register, get_base_data_dir
+
+    logger = logging.getLogger(__name__)
+
+    # Base directory for cleaned CSV files
+    base_dir = get_base_data_dir() / "cleaned"
+
+    # Auto-detect latest cleaned CSV for each register
+    register_files = {}
+    for register_type in RegisterType:
+        latest_file = get_latest_csv_for_register(
+            register_type,
+            base_dir,
+            file_stage="cleaned",
+            prefer_llm=True  # Prefer _clean_llm.csv if available
+        )
+        if latest_file:
+            register_files[register_type] = latest_file
+        else:
+            logger.warning(f"No cleaned CSV found for {register_type.value.upper()}")
+
+    if not register_files:
+        raise HTTPException(
+            status_code=404,
+            detail="No cleaned CSV files found. Check data/cleaned/ directory structure."
+        )
+
+    try:
+        # Create tables if they don't exist
+        Base.metadata.create_all(bind=engine)
+
+        # Import each register
+        import_summary = {}
+        for register_type, csv_path in register_files.items():
+            if not csv_path.exists():
+                logger.warning(f"CSV file {csv_path} not found, skipping {register_type.value.upper()}")
+                continue
+
+            logger.info(f"Importing {register_type.value.upper()} register from {csv_path}")
+
+            # Import CSV to database
+            import_csv_to_db(db, str(csv_path), register_type)
+
+            # Get count of imported entities for this register
+            count = db.query(Entity).filter(Entity.register_type == register_type).count()
+            import_summary[register_type.value] = {
+                "csv_path": str(csv_path),
+                "entities_count": count
+            }
+
+        # Get total count
+        total_count = db.query(Entity).count()
+
+        return {
+            "message": "All registers imported successfully",
+            "registers": import_summary,
+            "total_entities": total_count
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error importing all registers: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error importing all registers: {str(e)}"
         )
 
 

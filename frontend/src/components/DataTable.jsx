@@ -189,11 +189,16 @@ const createCellRenderer = (columnId, registerType) => {
     case 'credit_institution':
     case 'exemption_48_4':
     case 'exemption_48_5':
-    case 'dti_ffg':
       return (info) => {
         const value = info.getValue();
         if (value === null || value === undefined) return '-';
         return value ? 'Yes' : 'No';
+      };
+
+    case 'dti_ffg':
+      return (info) => {
+        const value = info.getValue();
+        return value || '-';
       };
 
     case 'reason':

@@ -252,8 +252,17 @@ function App({ registerType = 'casp' }) {
           {/* Register type selector tabs */}
           <RegisterSelector />
 
-          {/* Only show filters if there are entries in the register (after loading) */}
-          {(!loading || count > 0) && count > 0 && (
+          {/* Show filters if there are results OR if any filters are active (so user can clear them) */}
+          {(() => {
+            const hasActiveFilters = !!(
+              filters.search ||
+              (filters.home_member_states && filters.home_member_states.length > 0) ||
+              (filters.service_codes && filters.service_codes.length > 0) ||
+              filters.auth_date_from ||
+              filters.auth_date_to
+            );
+            return (!loading || count > 0 || hasActiveFilters) && (count > 0 || hasActiveFilters);
+          })() && (
             <Filters
               registerType={registerType}
               filters={filters}
@@ -578,10 +587,10 @@ function App({ registerType = 'casp' }) {
                         )}
 
                         {/* DTI FFG */}
-                        {selectedEntity.dti_ffg !== null && selectedEntity.dti_ffg !== undefined && (
+                        {selectedEntity.dti_ffg && (
                           <div>
                             <dt className="text-xs font-medium text-textSoft mb-0.5">DTI FFG</dt>
-                            <dd className="text-sm text-textMain">{selectedEntity.dti_ffg ? 'Yes' : 'No'}</dd>
+                            <dd className="text-sm text-textMain">{selectedEntity.dti_ffg}</dd>
                           </div>
                         )}
 
@@ -706,10 +715,10 @@ function App({ registerType = 'casp' }) {
                         )}
 
                         {/* DTI FFG */}
-                        {selectedEntity.dti_ffg !== null && selectedEntity.dti_ffg !== undefined && (
+                        {selectedEntity.dti_ffg && (
                           <div>
                             <dt className="text-xs font-medium text-textSoft mb-0.5">DTI FFG</dt>
-                            <dd className="text-sm text-textMain">{selectedEntity.dti_ffg ? 'Yes' : 'No'}</dd>
+                            <dd className="text-sm text-textMain">{selectedEntity.dti_ffg}</dd>
                           </div>
                         )}
 
