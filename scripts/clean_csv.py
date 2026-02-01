@@ -30,6 +30,31 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.csv_clean import CSVCleaner
+from app.models import RegisterType
+from app.config.registers import get_register_config
+from app.utils.file_utils import get_base_data_dir
+from typing import Optional
+
+
+def detect_register_type(filename: str) -> Optional[RegisterType]:
+    """Detect register type from CSV filename.
+
+    Examples:
+        CASP20260130.csv → RegisterType.CASP
+        ART20260129_clean.csv → RegisterType.ART
+
+    Args:
+        filename: CSV filename to detect from
+
+    Returns:
+        RegisterType if detected, None otherwise
+    """
+    filename_upper = filename.upper()
+    for register_type in RegisterType:
+        prefix = get_register_config(register_type).csv_prefix
+        if filename_upper.startswith(prefix):
+            return register_type
+    return None
 
 
 def print_summary(report: dict, dry_run: bool = False) -> None:
@@ -132,21 +157,35 @@ Examples:
         print(f"Error: Input file not found: {args.input}", file=sys.stderr)
         return 2
 
+    # Detect register type (with fallback to CASP)
+    register_type = detect_register_type(args.input.name)
+    if register_type:
+        print(f"Detected register: {register_type.value.upper()}")
+    else:
+        print("⚠️  Warning: Could not detect register type, falling back to CASP")
+        register_type = RegisterType.CASP  # Fallback
+
     # Determine output file
     if args.output:
         output_path = args.output
     else:
-        # Default: save to data/cleaned/ directory
-        if 'raw' in str(args.input):
-            # If input is in data/raw/, save to data/cleaned/
-            output_path = Path("data/cleaned") / f"{args.input.stem}_clean{args.input.suffix}"
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-        else:
-            # Otherwise, save in same directory as input
-            output_path = args.input.parent / f"{args.input.stem}_clean{args.input.suffix}"
+        input_path = args.input
+        register_name = register_type.value if register_type else "unknown"
 
-    # Create cleaner
-    cleaner = CSVCleaner(args.input)
+        # Check if in raw/ subdir, if so output to cleaned/ subdir
+        if "raw" in input_path.parts:
+            base_dir = get_base_data_dir() / "cleaned" / register_name
+            base_dir.mkdir(parents=True, exist_ok=True)
+            output_name = input_path.stem + "_clean" + input_path.suffix
+            output_path = base_dir / output_name
+        else:
+            # Fallback: same dir with _clean suffix
+            output_path = input_path.parent / (input_path.stem + "_clean" + input_path.suffix)
+
+        print(f"Auto-detected output path: {output_path}")
+
+    # Create cleaner with register type
+    cleaner = CSVCleaner(args.input, register_type=register_type)
 
     # Load CSV
     if not cleaner.load_csv():

@@ -2,7 +2,7 @@
 
 ## Overview
 
-LLM Remediation is an optional component of the ESMA CSV pipeline that uses Gemini API to fix edge cases that cannot be handled by deterministic cleaning. It operates with strict guardrails, full auditability, and minimal data sharing.
+LLM Remediation is an optional component of the ESMA CSV pipeline that uses Deepseek API to fix edge cases that cannot be handled by deterministic cleaning. It operates with strict guardrails, full auditability, and minimal data sharing.
 
 ## Pipeline Stages
 
@@ -57,18 +57,17 @@ Stable row identification that survives merge/dedup operations:
 2. **Fallback**: `ae_lei + ae_competentAuthority + ac_serviceCode_cou` (for duplicate LEI)
 3. **Last resort**: `synthetic_id` (hash of key fields: lei_name, commercial_name, competentAuthority, homeMemberState, row_index)
 
-## Gemini Model Fallback
+## Deepseek Model Fallback
 
 Models are tried in order until one succeeds:
 
-1. `gemini-3-flash-preview` (first attempt - preview version of gemini-3-flash)
-2. `gemini-2.5-flash` (fallback - 5 RPM, 250K TPM, 20 RPD - stable version)
-3. `gemini-2.5-flash-lite` (last resort - 10 RPM, 250K TPM, 20 RPD)
+1. `deepseek-reasoner` (first attempt - thinking mode, better for complex cases)
+2. `deepseek-chat` (fallback - non-thinking mode, faster)
 
-**Note:** 
-- Model names use dots (`.`) not dashes (`-`). The correct name is `gemini-2.5-flash`, not `gemini-2-5-flash`.
-- `gemini-3-flash` is not available in the API, only `gemini-3-flash-preview` exists.
-- Available models can be checked via `genai.list_models()`.
+**Note:**
+- `deepseek-reasoner` uses reasoning/thinking mode which provides better quality for complex data cleaning tasks
+- `deepseek-chat` is faster and suitable for simpler transformations
+- Both models use OpenAI-compatible API
 
 If all models fail, the process aborts with an error.
 
@@ -80,8 +79,8 @@ If all models fail, the process aborts with an error.
 
 ## API Key Configuration
 
-- **Environment variable**: `GEMINI_API_KEY`
-- **Default (development)**: `REDACTED_GEMINI_KEY`
+- **Environment variable**: `DEEPSEEK_API_KEY`
+- **Get API key from**: https://platform.deepseek.com/api_keys
 - **Production**: Set in Railway/Vercel environment variables
 
 ## Schemas
@@ -117,8 +116,8 @@ If all models fail, the process aborts with an error.
 {
   "patch_id": "uuid",
   "generated_at": "ISO datetime",
-  "model_provider": "gemini",
-  "model_name": "gemini-3-flash | gemini-2-5-flash | gemini-2.5-flash-lite",
+  "model_provider": "deepseek",
+  "model_name": "deepseek-reasoner | deepseek-chat",
   "tasks": [
     {
       "task_id": "uuid",
@@ -130,8 +129,8 @@ If all models fail, the process aborts with an error.
     }
   ],
   "metadata": {
-    "models_tried": ["gemini-3-flash", "..."],
-    "model_used": "gemini-3-flash",
+    "models_tried": ["deepseek-reasoner", "deepseek-chat"],
+    "model_used": "deepseek-reasoner",
     "tasks_processed": 10,
     "tasks_total": 10
   }
@@ -163,7 +162,7 @@ python scripts/generate_remediation_tasks.py \
 python scripts/run_llm_remediation.py \
   remediation_tasks.json \
   --out remediation_patch.json \
-  --api-key $GEMINI_API_KEY
+  --api-key $DEEPSEEK_API_KEY
 ```
 
 ### Apply Patch
@@ -190,14 +189,14 @@ python scripts/apply_remediation_patch.py \
 ## Testing
 
 - Unit tests for task generation, policy enforcement, patch application
-- Mocked Gemini API responses for LLM client tests
+- Mocked Deepseek API responses for LLM client tests
 - Integration tests for full pipeline
 - Test guardrails block forbidden edits
 
 ## Configuration
 
 Environment variables:
-- `GEMINI_API_KEY`: Gemini API key (required)
+- `DEEPSEEK_API_KEY`: Deepseek API key (required)
 
 Config file (optional): `config/remediation_config.yaml`
 - `llm.enabled: true/false`

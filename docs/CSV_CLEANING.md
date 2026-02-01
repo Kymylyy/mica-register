@@ -106,10 +106,12 @@ python scripts/clean_csv.py --input CASP20251208.csv --output clean.csv --report
 - **Invalid format**: If all attempts fail, left as-is with warning
   - **Type**: `LEI_WARNING` (non-blocking - import may skip the row)
 
-### 8. Duplicate LEI
-- **Issue**: Multiple rows with the same LEI
-- **Fix**: Merged into single row with combined services, countries, websites
-- **Type**: `DUPLICATE_LEI_MERGED`
+### 8. Duplicate LEI [REMOVED]
+- **Previous behavior**: Multiple rows with the same LEI were merged
+- **Current behavior**: All rows preserved as-is, duplicate LEI allowed
+- **Rationale**: Some registers legitimately have multiple rows per LEI
+  - Example: OTHER - one company (LEI) with 77 white papers (77 rows)
+- **Type**: ~~`DUPLICATE_LEI_MERGED`~~ (no longer generated)
 
 ### 9. Address/Website Parsing
 - **Issue**: Address incorrectly split into website column
@@ -189,7 +191,6 @@ The cleaning report (JSON) contains:
       "DATE_FIXED": 1,
       "MULTILINE_FIXED": 1,
       "ENCODING_FIXED": 3,
-      "DUPLICATE_LEI_MERGED": 1,
       ...
     }
   }
@@ -334,7 +335,7 @@ print(f"Made {report['summary']['total_changes']} changes")
   5. Multiline fields
   6. Country codes
   7. LEI format
-  8. Duplicate LEI merging
+  8. [REMOVED] ~~Duplicate LEI merging~~ - now preserving all rows
   9. Address/website parsing
   10. Service codes
   11. Commercial names

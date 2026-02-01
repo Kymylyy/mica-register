@@ -1,8 +1,10 @@
 """
-CSV Validation Module for ESMA CASP Register
+CSV Validation Module for ESMA MiCA Registers
 
 Validates CSV files before import, detecting issues with structure, schema,
 data formats, and encoding. Produces structured JSON reports.
+
+Supports all 5 ESMA MiCA registers: CASP, OTHER, ART, EMT, NCASP
 """
 
 import csv
@@ -13,6 +15,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
 import json
+
+# Import register configuration
+from .config.registers import RegisterType, get_register_config
 
 # Optional dependencies with graceful degradation
 try:
@@ -26,22 +31,6 @@ try:
     HAS_PYCOUNTRY = True
 except ImportError:
     HAS_PYCOUNTRY = False
-
-# Required columns based on importer usage
-REQUIRED_COLUMNS = [
-    "ae_lei",
-    "ac_serviceCode",
-    "ac_serviceCode_cou",
-    "ac_authorisationNotificationDate",
-    "ac_lastupdate",
-]
-
-# Date columns used by importer
-DATE_COLUMNS = [
-    "ac_authorisationNotificationDate",
-    "ac_authorisationEndDate",
-    "ac_lastupdate",
-]
 
 # Static EU+EEA+UK+CH country codes (fallback if pycountry not available)
 STATIC_COUNTRY_CODES = {
@@ -225,8 +214,8 @@ def validate_country_code(code: str) -> bool:
 
     if HAS_PYCOUNTRY:
         try:
-            pycountry.countries.get(alpha_2=code)
-            return True
+            result = pycountry.countries.get(alpha_2=code)
+            return result is not None
         except (KeyError, AttributeError):
             return False
     else:
@@ -334,10 +323,10 @@ def validate_csv_structure(
     return rows, header, rows_total, rows_parsed
 
 
-def validate_schema(header: List[str], issues: List[Issue]) -> None:
+def validate_schema(header: List[str], issues: List[Issue], required_columns: List[str]) -> None:
     """Validate CSV schema/header"""
     # Check for required columns
-    missing_columns = [col for col in REQUIRED_COLUMNS if col not in header]
+    missing_columns = [col for col in required_columns if col not in header]
     if missing_columns:
         issues.append(Issue(
             severity=Severity.ERROR,
@@ -443,12 +432,12 @@ def validate_duplicate_lei(rows: List[List[str]], header: List[str], issues: Lis
         ))
 
 
-def validate_dates(rows: List[List[str]], header: List[str], issues: List[Issue]) -> None:
+def validate_dates(rows: List[List[str]], header: List[str], issues: List[Issue], date_columns: List[str]) -> None:
     """Validate date columns"""
     date_issues_unparsable = []
     date_issues_repairable = []
 
-    for date_col in DATE_COLUMNS:
+    for date_col in date_columns:
         if date_col not in header:
             continue
 
@@ -703,38 +692,61 @@ def validate_encoding(rows: List[List[str]], header: List[str], issues: List[Iss
         ))
 
 
-def validate_csv(file_path: Path, max_examples: int = 5) -> Dict[str, Any]:
+def validate_csv(file_path: Path, register_type: RegisterType = RegisterType.CASP, max_examples: int = 5) -> Dict[str, Any]:
     """
     Main validation function.
     Returns a dictionary suitable for JSON serialization.
+
+    Args:
+        file_path: Path to CSV file
+        register_type: Register type to validate (CASP, OTHER, ART, EMT, NCASP)
+        max_examples: Maximum number of examples to include in report
     """
     issues: List[Issue] = []
     encoding_info = detect_encoding(file_path)
+
+    # Get register configuration
+    config = get_register_config(register_type)
 
     # Read CSV with structure validation
     rows, header, rows_total, rows_parsed = validate_csv_structure(
         file_path, encoding_info.detected, issues
     )
 
+    # Get date columns dynamically from config
+    date_columns = []
+    for csv_col in config.column_mapping.keys():
+        if 'date' in csv_col.lower() or 'lastupdate' in csv_col.lower():
+            date_columns.append(csv_col)
+
     # Run all validations
-    validate_schema(header, issues)
-    validate_lei_format(rows, header, issues)
-    validate_duplicate_lei(rows, header, issues)
-    validate_dates(rows, header, issues)
-    validate_service_codes(rows, header, issues)
-    validate_country_codes(rows, header, issues)
+    validate_schema(header, issues, config.required_columns)
+
+    # LEI validation - skip for NCASP as LEI is often missing
+    if register_type != RegisterType.NCASP:
+        validate_lei_format(rows, header, issues)
+        validate_duplicate_lei(rows, header, issues)
+
+    validate_dates(rows, header, issues, date_columns)
+
+    # CASP-specific validations
+    if register_type == RegisterType.CASP:
+        validate_service_codes(rows, header, issues)
+        validate_country_codes(rows, header, issues)
+
     validate_multiline_fields(rows, header, issues)
     validate_encoding(rows, header, issues)
 
     # Count issues by severity
     error_count = sum(1 for issue in issues if issue.severity == Severity.ERROR)
     warning_count = sum(1 for issue in issues if issue.severity == Severity.WARNING)
-    
+
     # Build report
     report = {
         "version": 1,
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "input_file": str(file_path),
+        "register_type": register_type.value,
         "encoding": encoding_info.to_dict(),
         "stats": {
             "rows_total": rows_total,

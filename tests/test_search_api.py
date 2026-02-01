@@ -33,7 +33,8 @@ def test_search_api_endpoint():
         print(f"   Response: {response.text}")
         return False
     
-    entities = response.json()
+    data = response.json()
+    entities = data.get("items", data) if isinstance(data, dict) else data
     count = len(entities)
     print(f"   Found {count} entities")
     
@@ -67,7 +68,8 @@ def test_search_api_endpoint():
         print(f"   ✗ Status code: {response.status_code}")
         return False
     
-    entities2 = response.json()
+    data2 = response.json()
+    entities2 = data2.get("items", data2) if isinstance(data2, dict) else data2
     count2 = len(entities2)
     print(f"   Found {count2} entities")
     
@@ -83,7 +85,8 @@ def test_search_api_endpoint():
         print(f"   ✗ Status code: {response.status_code}")
         return False
     
-    entities3 = response.json()
+    data3 = response.json()
+    entities3 = data3.get("items", data3) if isinstance(data3, dict) else data3
     count3 = len(entities3)
     print(f"   Found {count3} entities")
     

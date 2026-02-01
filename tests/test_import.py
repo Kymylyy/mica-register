@@ -11,38 +11,40 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.database import SessionLocal, engine, Base
 from app.import_csv import import_csv_to_db
-from app.models import Entity, Service, PassportCountry
+from app.models import Entity, Service, PassportCountry, RegisterType
+from app.utils.file_utils import get_latest_csv_for_register, get_base_data_dir
 
 def test_import():
     """Test CSV import"""
     print("=" * 50)
     print("Testing CSV Import")
     print("=" * 50)
-    
+
     # Create tables
     print("\n1. Creating database tables...")
     Base.metadata.drop_all(bind=engine)  # Drop existing
     Base.metadata.create_all(bind=engine)
     print("   ✓ Tables created")
-    
-    # Import data - try cleaned CSV files (import_csv_to_db expects cleaned CSV)
-    possible_paths = [
-        os.path.join(os.path.dirname(__file__), "..", "data", "cleaned", "CASP20251223_clean.csv"),
-        os.path.join(os.path.dirname(__file__), "..", "data", "cleaned", "CASP20251215_clean.csv"),
-        os.path.join(os.path.dirname(__file__), "..", "data", "cleaned", "*.csv"),  # Fallback pattern
-        os.path.join(os.path.dirname(__file__), "..", "data", "casp-register.csv"),  # Legacy fallback
-    ]
-    
-    csv_path = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            csv_path = path
-            break
-    
-    if not csv_path:
-        print(f"   ✗ CSV file not found. Tried: {possible_paths}")
-        return False
-    
+
+    # Find latest cleaned CASP CSV using file_utils
+    base_dir = get_base_data_dir()
+    csv_file = get_latest_csv_for_register(
+        RegisterType.CASP,
+        base_dir / "cleaned",
+        file_stage="cleaned"
+    )
+
+    if not csv_file:
+        # Fallback to old location
+        legacy_path = os.path.join(os.path.dirname(__file__), "..", "data", "casp-register.csv")
+        if os.path.exists(legacy_path):
+            csv_path = legacy_path
+        else:
+            print(f"   ✗ No CASP CSV file found")
+            return False
+    else:
+        csv_path = str(csv_file)
+
     print(f"\n2. Importing data from {csv_path}...")
     db = SessionLocal()
     try:

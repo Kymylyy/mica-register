@@ -1,0 +1,4 @@
+ae_competentAuthority,ae_lei,ae_lei_name,ae_commercial_name,ae_homeMemberState,ae_lei_cou_code,ae_website,ae_infrigment,ae_reason,ae_decision_date
+BaFin,,,Crypto Scam Platform GmbH,DE,,https://scam-crypto.de|https://scam-crypto.com,YES,Unauthorized crypto-asset services provision,15/01/2025
+AMF,969500SUSPICIOUS123,Fake Exchange France SA,Fake Exchange France,FR,FR,https://fake-exchange.fr,YES,Operating without authorization and misleading advertising,20/02/2024
+CSSF,,,Luxembourg Ponzi Scheme,LU,,https://ponzi-lux.lu|https://ponzi-lux.com|https://invest-ponzi.lu,YES,Pyramid scheme using crypto-assets,10/03/2023
