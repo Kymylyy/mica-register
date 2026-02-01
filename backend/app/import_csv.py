@@ -418,8 +418,9 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
         comments = str(row.get(comments_col, '')).strip() if not pd.isna(row.get(comments_col)) else None
 
         # === Create base Entity ===
+        # Use register_type_value (lowercase string) to match PostgreSQL enum values
         entity = Entity(
-            register_type=register_type,
+            register_type=register_type_value,
             competent_authority=competent_authority,
             home_member_state=home_member_state,
             lei_name=lei_name,
