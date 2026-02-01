@@ -308,7 +308,7 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
             raise ValueError(f"Unknown register_type: {register_type}") from exc
 
     # Normalize to lowercase string for DB comparisons (Postgres ENUM uses lowercase)
-    register_type_value = register_type.value if isinstance(register_type, RegisterType) else str(register_type).lower()
+    register_type_value = (register_type.value if hasattr(register_type, "value") else str(register_type)).lower()
 
     # Get register configuration
     config = get_register_config(register_type)
@@ -360,7 +360,7 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
         db.execute(text("DELETE FROM ncasp_entities WHERE id IN (SELECT id FROM entities WHERE register_type = 'ncasp')"))
 
     # Delete entity_tags for this register
-    db.execute(text(f"DELETE FROM entity_tags WHERE entity_id IN (SELECT id FROM entities WHERE register_type = '{register_type.value}')"))
+    db.execute(text(f"DELETE FROM entity_tags WHERE entity_id IN (SELECT id FROM entities WHERE register_type = '{register_type_value}')"))
 
     # Delete entities for this register type
     db.query(Entity).filter(Entity.register_type == register_type_value).delete()
