@@ -350,6 +350,9 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
         db.execute(text("DELETE FROM casp_entity_service WHERE casp_entity_id IN (SELECT id FROM entities WHERE register_type = 'casp')"))
         db.execute(text("DELETE FROM casp_entity_passport_country WHERE casp_entity_id IN (SELECT id FROM entities WHERE register_type = 'casp')"))
         db.execute(text("DELETE FROM casp_entities WHERE id IN (SELECT id FROM entities WHERE register_type = 'casp')"))
+        # Legacy association tables (kept for backward compatibility) still reference entities
+        db.execute(text("DELETE FROM entity_service WHERE entity_id IN (SELECT id FROM entities WHERE register_type = 'casp')"))
+        db.execute(text("DELETE FROM entity_passport_country WHERE entity_id IN (SELECT id FROM entities WHERE register_type = 'casp')"))
     elif register_type == RegisterType.OTHER:
         db.execute(text("DELETE FROM other_entities WHERE id IN (SELECT id FROM entities WHERE register_type = 'other')"))
     elif register_type == RegisterType.ART:
