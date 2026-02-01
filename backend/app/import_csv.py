@@ -300,6 +300,13 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
     - Parsing dates, booleans, and pipe-separated values per register config
     - Creating database entities with correct extension tables
     """
+    # Normalize register_type to enum (handles accidental string input like "CASP")
+    if isinstance(register_type, str):
+        try:
+            register_type = RegisterType(register_type.lower())
+        except ValueError as exc:
+            raise ValueError(f"Unknown register_type: {register_type}") from exc
+
     # Get register configuration
     config = get_register_config(register_type)
     print(f"Importing {register_type.value.upper()} register from: {csv_path}")
