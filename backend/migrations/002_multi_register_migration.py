@@ -184,6 +184,15 @@ def run_migration():
                 conn.commit()
                 logger.info("  ✅ Recreated simple index on lei")
 
+            # Increase lei_cou_code size (some codes like 'BVI' are longer than 2)
+            if is_postgres(engine):
+                try:
+                    conn.execute(text("ALTER TABLE entities ALTER COLUMN lei_cou_code TYPE VARCHAR(10)"))
+                    conn.commit()
+                    logger.info("  ✅ Increased lei_cou_code to VARCHAR(10)")
+                except Exception as e:
+                    logger.warning(f"  ⚠️  Could not alter lei_cou_code: {e}")
+
             # ========================================================================
             # STEP 3: Make common fields nullable
             # ========================================================================
