@@ -362,8 +362,8 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
     # Delete entity_tags for this register
     db.execute(text(f"DELETE FROM entity_tags WHERE entity_id IN (SELECT id FROM entities WHERE register_type = '{register_type_value}')"))
 
-    # Delete entities for this register type
-    db.query(Entity).filter(Entity.register_type == register_type_value).delete()
+    # Delete entities for this register type (use raw SQL to avoid SQLAlchemy Enum name/value mismatch)
+    db.execute(text(f"DELETE FROM entities WHERE register_type = '{register_type_value}'"))
     db.commit()
 
     # Caches to avoid duplicate objects in same session (CASP only)
