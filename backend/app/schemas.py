@@ -83,7 +83,7 @@ class EntityBase(BaseModel):
     lei_name_casp: Optional[str] = None
     offer_countries: Optional[str] = None  # Pipe-separated
     dti_codes: Optional[str] = None  # Pipe-separated
-    dti_ffg: Optional[bool] = None
+    dti_ffg: Optional[str] = None  # DTI FFG code (identifier string)
 
     # ART-specific fields (populated from art_entity relationship)
     # Will be None for non-ART registers

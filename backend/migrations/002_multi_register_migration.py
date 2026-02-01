@@ -222,7 +222,7 @@ def run_migration():
                         lei_name_casp VARCHAR,
                         lei_casp VARCHAR,
                         offer_countries TEXT,
-                        dti_ffg BOOLEAN,
+                        dti_ffg VARCHAR,  -- DTI FFG code (identifier string, NOT boolean) - e.g., '1SL20Z9P1'
                         dti_codes TEXT,
                         white_paper_url VARCHAR,
                         white_paper_comments TEXT,
@@ -264,7 +264,7 @@ def run_migration():
                         exemption_48_4 BOOLEAN,
                         exemption_48_5 BOOLEAN,
                         authorisation_other_emt TEXT,
-                        dti_ffg BOOLEAN,
+                        dti_ffg VARCHAR,  -- DTI FFG code (identifier string, NOT boolean) - e.g., '13XTMPZT3'
                         dti_codes TEXT,
                         white_paper_url VARCHAR,
                         white_paper_notification_date DATE,

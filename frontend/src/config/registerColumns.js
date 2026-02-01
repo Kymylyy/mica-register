@@ -145,8 +145,9 @@ const OTHER_SPECIFIC_COLUMNS = [
   {
     id: 'dti_ffg',
     label: 'DTI FFG',
-    description: 'Digital token identifier - First-in-First-out Group',
+    description: 'Digital Token Identifier - FFG code',
     visible: false,
+    size: 120,
   },
   {
     id: 'dti_codes',
@@ -243,14 +244,14 @@ const EMT_SPECIFIC_COLUMNS = [
   },
   {
     id: 'white_paper_notification_date',
-    label: 'WP #1',
+    label: 'WP NOTIFICATION DATE',
     description: 'White paper authorization/notification date',
     visible: true,  // Visible by default
     size: 130,
   },
   {
     id: 'white_paper_url',
-    label: 'WP #2',
+    label: 'WHITE PAPER URL',
     description: 'White paper URL',
     visible: true,  // Changed from false
     size: 250,
@@ -258,8 +259,9 @@ const EMT_SPECIFIC_COLUMNS = [
   {
     id: 'dti_ffg',
     label: 'DTI FFG',
-    description: 'Digital token identifier - First-in-First-out Group',
+    description: 'Digital Token Identifier - FFG code',
     visible: false,
+    size: 120,
   },
   {
     id: 'dti_codes',
@@ -275,7 +277,7 @@ const EMT_SPECIFIC_COLUMNS = [
   },
   {
     id: 'white_paper_comments',
-    label: 'WP #3',
+    label: 'WP Comments',
     description: 'White paper comments',
     visible: false,
     size: 280,
@@ -380,8 +382,8 @@ export function getRegisterColumns(registerType) {
       return [...emtCommon, ...EMT_SPECIFIC_COLUMNS];
 
     case 'ncasp':
-      // NCASP doesn't have address in CSV
-      const ncaspCommon = baseColumns.filter(col => col.id !== 'address');
+      // NCASP doesn't have address or website (uses 'websites' instead) in CSV
+      const ncaspCommon = baseColumns.filter(col => col.id !== 'address' && col.id !== 'website');
       return [...ncaspCommon, ...NCASP_SPECIFIC_COLUMNS];
 
     default:
@@ -447,7 +449,7 @@ export function getRegisterCounterLabel(registerType) {
     casp: 'Entities',       // CASPs are entities
     other: 'WHITE PAPERS',   // OTHER register = whitepapers
     art: 'Whitepapers',     // ART register = whitepapers for asset-referenced tokens
-    emt: 'Whitepapers',     // EMT register = whitepapers for e-money tokens
+    emt: 'WHITE PAPERS',     // EMT register = whitepapers for e-money tokens
     ncasp: 'Entities',      // Non-compliant entities
   };
   return labels[registerType?.toLowerCase()] || 'Entities';

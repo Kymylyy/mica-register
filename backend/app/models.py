@@ -172,7 +172,7 @@ class Entity(Base):
 
     @property
     def dti_ffg(self):
-        """OTHER/EMT: dti_ffg (boolean)"""
+        """OTHER/EMT: dti_ffg (DTI FFG code string)"""
         if self.other_entity:
             return self.other_entity.dti_ffg
         elif self.emt_entity:
@@ -270,7 +270,7 @@ class OtherEntity(Base):
     lei_name_casp = Column(String, nullable=True)  # Linked CASP name
     lei_casp = Column(String, nullable=True)  # Linked CASP LEI
     offer_countries = Column(Text, nullable=True)  # Pipe-separated country codes
-    dti_ffg = Column(Boolean, nullable=True)
+    dti_ffg = Column(String, nullable=True)  # DTI FFG code (identifier string)
     dti_codes = Column(Text, nullable=True)  # Pipe-separated DTI codes
     white_paper_url = Column(String, nullable=True)
     white_paper_comments = Column(Text, nullable=True)
@@ -316,7 +316,7 @@ class EmtEntity(Base):
     exemption_48_4 = Column(Boolean, nullable=True)  # YES/NO in CSV
     exemption_48_5 = Column(Boolean, nullable=True)  # YES/NO in CSV
     authorisation_other_emt = Column(Text, nullable=True)
-    dti_ffg = Column(Boolean, nullable=True)
+    dti_ffg = Column(String, nullable=True)  # DTI FFG code (identifier string)
     dti_codes = Column(Text, nullable=True)  # Pipe-separated
     white_paper_url = Column(String, nullable=True)
     white_paper_notification_date = Column(Date, nullable=True)
