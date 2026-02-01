@@ -73,7 +73,7 @@ class Entity(Base):
     home_member_state = Column(String(2), index=True)
     lei_name = Column(String, index=True)  # Index added for search performance
     lei = Column(String, nullable=True, index=True)  # Nullable (NCASP often missing)
-    lei_cou_code = Column(String(2))
+    lei_cou_code = Column(String(10))  # Some codes like 'BVI' are longer than 2
 
     # Fields present in MOST registers (nullable for OTHER/NCASP)
     commercial_name = Column(String, nullable=True, index=True)
