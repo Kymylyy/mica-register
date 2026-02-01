@@ -1,0 +1,4 @@
+ae_competentAuthority,ae_lei,ae_lei_name,ae_commercial_name,ae_homeMemberState,ae_lei_cou_code,ae_website_platform,ac_authorisationNotificationDate,ac_authorisationEndDate,ac_serviceCode,ac_serviceCode_cou
+BaFin,5299001HFNLCLQMF3X50,Binance Europe Services Limited,Binance Europe Services Ltd.,DE,DE,https://www.binance.com,15/01/2025,,a|e,BE|FR|NL
+AMF,969500CX1Y60EXKXQH23,Crypto Exchange France SA,Crypto Exchange France,FR,FR,https://crypto-exchange.fr,20/02/2024,,a|d,
+CSSF,549300VQCFXP8VPUWM89,Luxembourg Digital Assets SA,Luxembourg Digital Assets SA,LU,LU,https://lux-digital.lu,10/03/2023,31/12/2025,a|e|f,DE|FR|BE|IT

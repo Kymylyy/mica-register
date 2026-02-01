@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { FlagIcon } from './FlagIcon';
 import { getServiceDescription, getServiceShortName, getServiceCodeOrder } from '../utils/serviceDescriptions';
+import { getRegisterColumns, getDefaultColumnVisibility, getRegisterCounterLabel } from '../config/registerColumns';
 
 const columnHelper = createColumnHelper();
 
@@ -21,24 +22,216 @@ const ServiceTag = ({ serviceCode, fullDescription, shortName }) => (
   </span>
 );
 
-export function DataTable({ data, onRowClick, count }) {
+/**
+ * Create cell renderer for a specific column
+ */
+const createCellRenderer = (columnId, registerType) => {
+  switch (columnId) {
+    case 'commercial_name':
+      return (info) => {
+        const commercialName = info.getValue();
+        if (commercialName && commercialName.trim()) {
+          return <span className="font-medium">{commercialName}</span>;
+        }
+        const row = info.row.original;
+        return <span className="font-medium">{row.lei_name || '-'}</span>;
+      };
+
+    case 'home_member_state':
+      return (info) => {
+        const code = info.getValue();
+        return (
+          <div className="flex items-center gap-1.5">
+            {code && <FlagIcon countryCode={code} size="sm" />}
+            <span>{code || '-'}</span>
+          </div>
+        );
+      };
+
+    case 'authorisation_notification_date':
+    case 'authorisation_end_date':
+    case 'decision_date':
+    case 'last_update':
+    case 'white_paper_notification_date':
+      return (info) => {
+        const date = info.getValue();
+        return date ? new Date(date).toLocaleDateString() : '-';
+      };
+
+    case 'services':
+      return (info) => {
+        const services = info.getValue() || [];
+        if (services.length === 0) return '-';
+        const sortedServices = [...services].sort((a, b) =>
+          getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code)
+        );
+        return (
+          <div className="flex flex-wrap gap-2">
+            {sortedServices.map((service, idx) => (
+              <ServiceTag
+                key={idx}
+                serviceCode={service.code}
+                fullDescription={getServiceDescription(service.code)}
+                shortName={getServiceShortName(service.code)}
+              />
+            ))}
+          </div>
+        );
+      };
+
+    case 'passport_countries':
+      return (info) => {
+        const countries = info.getValue() || [];
+        if (countries.length === 0) return '-';
+        return (
+          <div className="flex flex-wrap gap-1">
+            {countries.map((country, idx) => (
+              <span key={idx} className="flex items-center gap-1">
+                <FlagIcon countryCode={country.country_code} />
+                <span className="text-xs">{country.country_code}</span>
+              </span>
+            ))}
+          </div>
+        );
+      };
+
+    case 'website':
+    case 'white_paper_url':
+      return (info) => {
+        const url = info.getValue();
+        if (!url) return '-';
+        const isUrl = /^(https?:\/\/|www\.|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,})/i.test(url.trim());
+        if (!isUrl) return '-';
+
+        // Remove protocol and www for display
+        let displayUrl = url.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+        const href = url.startsWith('http') ? url : `https://${url}`;
+
+        return (
+          <div className="max-w-[250px] min-w-0">
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline truncate block text-sm"
+              title={url}
+            >
+              {displayUrl}
+            </a>
+          </div>
+        );
+      };
+
+    case 'websites':
+      return (info) => {
+        const websites = info.getValue();
+        if (!websites) return '-';
+        const websiteList = websites.split('|').map(w => w.trim()).filter(w => w);
+        if (websiteList.length === 0) return '-';
+
+        return (
+          <div className="flex flex-col gap-1">
+            {websiteList.map((url, idx) => {
+              let displayUrl = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+              const href = url.startsWith('http') ? url : `https://${url}`;
+              return (
+                <a
+                  key={idx}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline break-words text-xs"
+                  title={url}
+                >
+                  {displayUrl}
+                </a>
+              );
+            })}
+          </div>
+        );
+      };
+
+    case 'lei_casp':
+      return (info) => {
+        const row = info.row.original;
+        const leiCasp = info.getValue();
+        const leiNameCasp = row.lei_name_casp;
+        if (!leiCasp && !leiNameCasp) return '-';
+
+        return (
+          <div className="text-sm">
+            {leiNameCasp && <div className="font-medium">{leiNameCasp}</div>}
+            {leiCasp && <div className="text-xs text-gray-500">{leiCasp}</div>}
+          </div>
+        );
+      };
+
+    case 'offer_countries':
+    case 'white_paper_offer_countries':
+      return (info) => {
+        const countries = info.getValue();
+        if (!countries) return '-';
+        const countryList = countries.split('|').map(c => c.trim()).filter(c => c);
+        if (countryList.length === 0) return '-';
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            {countryList.map((code, idx) => (
+              <span key={idx} className="flex items-center gap-1">
+                <FlagIcon countryCode={code} />
+                <span className="text-xs">{code}</span>
+              </span>
+            ))}
+          </div>
+        );
+      };
+
+    case 'credit_institution':
+    case 'exemption_48_4':
+    case 'exemption_48_5':
+      return (info) => {
+        const value = info.getValue();
+        if (value === null || value === undefined) return '-';
+        return value ? 'Yes' : 'No';
+      };
+
+    case 'dti_ffg':
+      return (info) => {
+        const value = info.getValue();
+        return value || '-';
+      };
+
+    case 'reason':
+      return (info) => {
+        const reason = info.getValue();
+        if (!reason || reason === 'None') return '-';
+        return <span className="text-xs">{reason}</span>;
+      };
+
+    case 'lei':
+    case 'lei_name':
+    case 'competent_authority':
+    case 'address':
+    case 'comments':
+    case 'white_paper_comments':
+    case 'dti_codes':
+    case 'authorisation_other_emt':
+    case 'infringement':
+      return (info) => info.getValue() || '-';
+
+    default:
+      console.warn(`No specific renderer for column: ${columnId}, using default`);
+      return (info) => info.getValue() || '-';
+  }
+};
+
+export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
   const [sorting, setSorting] = useState([]);
-  
-  // Default column visibility
-  const defaultColumnVisibility = {
-    commercial_name: true,
-    home_member_state: true,
-    authorisation_notification_date: true,
-    services: true,
-    // Hidden by default
-    lei: false,
-    lei_name: false,
-    address: false,
-    website: false,
-    competent_authority: false,
-    passport_countries: false,
-  };
-  
+
+  const defaultColumnVisibility = useMemo(
+    () => getDefaultColumnVisibility(registerType),
+    [registerType]
+  );
   const [columnVisibility, setColumnVisibility] = useState(defaultColumnVisibility);
   const detailsRef = useRef(null);
   
@@ -53,7 +246,12 @@ export function DataTable({ data, onRowClick, count }) {
   const resetToDefault = () => {
     setColumnVisibility(defaultColumnVisibility);
   };
-  
+
+  // Reset column visibility when register type changes
+  useEffect(() => {
+    setColumnVisibility(defaultColumnVisibility);
+  }, [registerType, defaultColumnVisibility]);
+
   // Close details when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -79,154 +277,20 @@ export function DataTable({ data, onRowClick, count }) {
     };
   }, []);
 
-  const columns = useMemo(
-    () => [
-      columnHelper.accessor('commercial_name', {
-        header: 'Commercial Name',
-        cell: info => {
-          const commercialName = info.getValue();
-          if (commercialName && commercialName.trim()) {
-            return <span className="font-medium">{commercialName}</span>;
-          }
-          // Fallback to lei_name if commercial_name is empty
-          const row = info.row.original;
-          return <span className="font-medium">{row.lei_name || '-'}</span>;
-        },
-      }),
-      columnHelper.accessor('home_member_state', {
-        header: 'Home Member State',
-        size: 180,
-        cell: info => {
-          const code = info.getValue();
-          return (
-            <div className="flex items-center gap-1.5">
-              {code && <FlagIcon countryCode={code} size="sm" />}
-              <span>{code || '-'}</span>
-            </div>
-          );
-        },
-      }),
-      columnHelper.accessor('authorisation_notification_date', {
-        header: 'Authorisation / notification date',
-        size: 160,
-        cell: info => {
-          const date = info.getValue();
-          return date ? new Date(date).toLocaleDateString() : '-';
-        },
-      }),
-      columnHelper.accessor('services', {
-        header: 'Crypto-asset services',
-        size: 500,
-        cell: info => {
-          const services = info.getValue() || [];
-          if (services.length === 0) return '-';
-          
-          // Sort services by MiCA order (a-j)
-          const sortedServices = [...services].sort((a, b) => {
-            return getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code);
-          });
-          
-          return (
-            <div className="flex flex-wrap gap-2">
-              {sortedServices.map((service, idx) => {
-                const fullDescription = getServiceDescription(service.code);
-                const shortName = getServiceShortName(service.code);
-                return (
-                  <ServiceTag
-                    key={idx}
-                    serviceCode={service.code}
-                    fullDescription={fullDescription}
-                    shortName={shortName}
-                  />
-                );
-              })}
-            </div>
-          );
-        },
-      }),
-      columnHelper.accessor('lei', {
-        header: 'LEI',
-        cell: info => info.getValue() || '-',
-      }),
-      columnHelper.accessor('lei_name', {
-        header: 'LEI Name',
-        cell: info => info.getValue() || '-',
-      }),
-      columnHelper.accessor('address', {
-        header: 'Address',
-        cell: info => info.getValue() || '-',
-      }),
-      columnHelper.accessor('website', {
-        header: 'Website',
-        size: 250,
-        cell: info => {
-          const url = info.getValue();
-          if (!url) return '-';
-          
-          // Check if the value looks like a URL (contains http://, https://, www., or domain pattern)
-          const isUrl = /^(https?:\/\/|www\.|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,})/i.test(url.trim());
-          
-          if (!isUrl) {
-            // If it's not a URL, display dash to indicate no website available
-            return '-';
-          }
-          
-          // Handle multiple URLs separated by " | "
-          const urlParts = url.split(' | ');
-          const displayUrls = urlParts.map(part => {
-            let displayUrl = part.trim();
-            // Remove protocol if present
-            displayUrl = displayUrl.replace(/^https?:\/\//i, '');
-            // Remove www. prefix
-            displayUrl = displayUrl.replace(/^www\./i, '');
-            return displayUrl;
-          });
-          const displayUrl = displayUrls.join(' | ');
-          
-          // Ensure href has protocol for proper linking
-          const href = url.startsWith('http://') || url.startsWith('https://') 
-            ? url 
-            : `https://${url}`;
-          
-          return (
-            <div className="max-w-[250px] min-w-0">
-              <a 
-                href={href} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-primary hover:underline break-words text-sm block"
-                title={url}
-              >
-                {displayUrl}
-              </a>
-            </div>
-          );
-        },
-      }),
-      columnHelper.accessor('competent_authority', {
-        header: 'Competent Authority',
-        cell: info => info.getValue() || '-',
-      }),
-      columnHelper.accessor('passport_countries', {
-        header: 'Passport Countries',
-        cell: info => {
-          const countries = info.getValue() || [];
-          if (countries.length === 0) return '-';
-          return (
-            <div className="flex flex-wrap gap-1">
-              {countries.map((country, idx) => (
-                <span key={idx} className="flex items-center gap-1">
-                  <FlagIcon countryCode={country.country_code} />
-                  <span className="text-xs">{country.country_code}</span>
-                </span>
-              ))}
-            </div>
-          );
-        },
-      }),
-    ],
-    []
-  );
+  const columns = useMemo(() => {
+    const registerColumns = getRegisterColumns(registerType);
+
+    return registerColumns.map(colDef =>
+      columnHelper.accessor(colDef.id, {
+        header: colDef.label,
+        size: colDef.size || 150,
+        cell: createCellRenderer(colDef.id, registerType),
+        meta: {
+          description: colDef.description
+        }
+      })
+    );
+  }, [registerType]);
 
   const table = useReactTable({
     data,
@@ -248,7 +312,7 @@ export function DataTable({ data, onRowClick, count }) {
       <div className="mb-3 flex justify-between items-center gap-2">
         {count !== undefined && (
           <span className="text-xs uppercase text-slate-400 tracking-wider pl-1.5">
-            <span className="font-semibold text-slate-600">{count}</span> ENTITIES
+            <span className="font-semibold text-slate-600">{count}</span> {getRegisterCounterLabel(registerType)}
           </span>
         )}
         <div className="flex items-center gap-2">
@@ -399,11 +463,7 @@ export function DataTable({ data, onRowClick, count }) {
                       headerIndex === 0 ? 'sticky left-0 z-20 bg-slate-50/80 backdrop-blur-sm' : ''
                     } ${headerIndex > 0 ? 'border-l border-gray-100' : ''}`}
                     style={{
-                      width: header.column.id === 'commercial_name' ? '280px' :
-                             header.column.id === 'home_member_state' ? '180px' :
-                             header.column.id === 'authorisation_notification_date' ? '160px' :
-                             header.column.id === 'website' ? '250px' :
-                             header.column.id === 'services' ? '500px' : 'auto'
+                      width: `${header.getSize()}px`
                     }}
                     onClick={header.column.getToggleSortingHandler()}
                   >

@@ -1,0 +1,4 @@
+ae_competentAuthority,ae_lei,ae_lei_name,ae_commercial_name,ae_homeMemberState,ae_lei_cou_code,ae_credit_institution,wp_url,wp_url_cou,ac_authorisationNotificationDate,ac_authorisationEndDate,wp_comments
+BaFin,5299001HFNLCLQMF3X50,Binance EUR Stablecoin Ltd,Binance EUR Stablecoin,DE,DE,YES,https://binance.com/eur-whitepaper.pdf,DE|FR|IT|NL,15/01/2025,,Approved for EU-wide distribution
+AMF,969500CX1Y60EXKXQH23,Euro Digital Token SA,Euro Digital Token,FR,FR,NO,https://euro-digital.fr/whitepaper,FR|BE|LU,20/02/2024,31/12/2026,Limited to specified countries
+CSSF,549300VQCFXP8VPUWM89,Luxembourg Stable Coin SA,Luxembourg Stable Coin,LU,LU,YES,https://lux-stable.lu/wp.pdf,LU|DE|FR|BE|IT|NL,10/03/2023,,Full approval granted

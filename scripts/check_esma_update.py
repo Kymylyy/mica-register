@@ -11,47 +11,40 @@ from glob import glob
 from datetime import datetime
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
+# Add backend to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
-def get_latest_csv_date(quiet=False):
-    """Get the date from the newest CSV file in data/cleaned/.
-    
+from app.models import RegisterType
+from app.utils.file_utils import get_latest_csv_for_register, extract_date_from_filename, get_base_data_dir
+
+
+def get_latest_csv_date(register_type: RegisterType = RegisterType.CASP, quiet=False):
+    """Get the date from the newest CSV file for a register.
+
     Args:
+        register_type: Register type to check (default: CASP for backward compatibility)
         quiet: If True, don't print warnings to stdout
-        
+
     Returns:
         Tuple of (datetime object, file path) or (None, None) if not found
     """
-    base_paths = [
-        Path(__file__).parent.parent / "data" / "cleaned",
-        Path("/app/data/cleaned"),  # Docker container
-    ]
-    
-    date_pattern = re.compile(r'CASP(\d{8})_clean(?:\.csv|_llm\.csv)$')
-    newest_date = None
-    newest_file = None
-    
-    for base_path in base_paths:
-        if base_path.exists():
-            # Check both _clean.csv and _clean_llm.csv files
-            for pattern_suffix in ["*_clean.csv", "*_clean_llm.csv"]:
-                pattern = str(base_path / pattern_suffix)
-                for file_path in glob(pattern):
-                    match = date_pattern.search(file_path)
-                    if match:
-                        file_date_str = match.group(1)  # YYYYMMDD
-                        if newest_date is None or file_date_str > newest_date:
-                            newest_date = file_date_str
-                            newest_file = file_path
-    
-    if newest_date:
-        # Parse YYYYMMDD format
-        try:
-            date_obj = datetime.strptime(newest_date, "%Y%m%d")
-            return date_obj, newest_file
-        except ValueError:
-            if not quiet:
-                print(f"Warning: Could not parse date from filename: {newest_date}")
-            return None, newest_file
+    base_dir = get_base_data_dir() / "cleaned"
+
+    # Use file_utils for consistent detection
+    latest_file = get_latest_csv_for_register(
+        register_type,
+        base_dir,
+        file_stage="cleaned",
+        prefer_llm=True
+    )
+
+    if latest_file:
+        # Extract date from filename
+        file_date = extract_date_from_filename(latest_file.name)
+        if file_date:
+            # Convert date to datetime for backward compatibility
+            date_obj = datetime(file_date.year, file_date.month, file_date.day)
+            return date_obj, str(latest_file)
     
     return None, None
 
@@ -236,4 +229,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -2,43 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
 import { FlagIcon } from './FlagIcon';
 import { getServiceDescriptionCapitalized, getServiceCodeOrder, getServiceShortName, getServiceDescription } from '../utils/serviceDescriptions';
+import { useDebounce } from '../utils/debounce';
+import { COUNTRY_NAMES } from '../utils/countryNames';
 
-// Country code to full English name mapping
-const COUNTRY_NAMES = {
-  'AT': 'Austria',
-  'BE': 'Belgium',
-  'BG': 'Bulgaria',
-  'CY': 'Cyprus',
-  'CZ': 'Czech Republic',
-  'DE': 'Germany',
-  'DK': 'Denmark',
-  'EE': 'Estonia',
-  'ES': 'Spain',
-  'FI': 'Finland',
-  'FR': 'France',
-  'GR': 'Greece',
-  'HR': 'Croatia',
-  'HU': 'Hungary',
-  'IE': 'Ireland',
-  'IS': 'Iceland',
-  'IT': 'Italy',
-  'LI': 'Liechtenstein',
-  'LT': 'Lithuania',
-  'LU': 'Luxembourg',
-  'LV': 'Latvia',
-  'MT': 'Malta',
-  'NL': 'Netherlands',
-  'NO': 'Norway',
-  'PL': 'Poland',
-  'PT': 'Portugal',
-  'RO': 'Romania',
-  'SE': 'Sweden',
-  'SI': 'Slovenia',
-  'SK': 'Slovakia',
-  'EL': 'Greece', // Alternative code for Greece
-};
-
-export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = true, onToggleVisibility }) {
+export function Filters({ registerType = 'casp', filters, onFiltersChange, onClearFilters, isVisible = true, onToggleVisibility }) {
   const [filterOptions, setFilterOptions] = useState({
     home_member_states: [],
     service_codes: [],
@@ -47,6 +14,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
     country_counts: {},
     service_counts: {},
   });
+  const filterCountsAbortControllerRef = useRef(null);
   const homeMemberStateSearchRef = useRef(null);
   const cryptoServicesSearchRef = useRef(null);
   const homeMemberStateDetailsRef = useRef(null);
@@ -60,6 +28,9 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
   const [cryptoServicesSearch, setCryptoServicesSearch] = useState('');
   const [authDateFromInput, setAuthDateFromInput] = useState('');
   const [authDateToInput, setAuthDateToInput] = useState('');
+
+  // Debounce search for filter counts (300ms)
+  const debouncedFilterSearch = useDebounce(filters.search, 300);
 
   // Auto-format date input: add dashes after 2 and 5 digits
   const handleDateInputChange = (value, setter, inputRef) => {
@@ -139,26 +110,46 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
   };
 
   useEffect(() => {
-    // Fetch filter options
-    api.get('/api/filters/options')
+    // Fetch filter options for current register type with AbortController
+    const abortController = new AbortController();
+
+    api.get(`/api/filters/options?register_type=${registerType}`, {
+      signal: abortController.signal
+    })
       .then(response => {
-        // Sort service codes by MiCA order
-        const sortedServiceCodes = response.data.service_codes.sort((a, b) => 
-          getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code)
-        );
-        setFilterOptions({
-          ...response.data,
-          service_codes: sortedServiceCodes.map(s => ({
-            ...s,
-            description: getServiceShortName(s.code) // Use short names like in table
-          }))
-        });
+        // Only update state if not aborted
+        if (!abortController.signal.aborted) {
+          // Sort service codes by MiCA order (only for CASP)
+          const serviceCodes = response.data.service_codes || [];
+          const sortedServiceCodes = serviceCodes.sort((a, b) =>
+            getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code)
+          );
+          setFilterOptions({
+            ...response.data,
+            service_codes: sortedServiceCodes.map(s => ({
+              ...s,
+              description: getServiceShortName(s.code) // Use short names like in table
+            }))
+          });
+        }
       })
       .catch(error => {
+        // Ignore errors from cancelled requests
+        if (
+          error.name === 'CanceledError' ||
+          error.name === 'AbortError' ||
+          error.code === 'ERR_CANCELED' ||
+          abortController.signal.aborted
+        ) {
+          return;
+        }
         console.error('Error fetching filter options:', error);
         console.error('Error details:', error.response?.data);
       });
-  }, []);
+
+    // Cleanup on unmount or registerType change
+    return () => abortController.abort();
+  }, [registerType]);
 
   // Sync date inputs with filters (convert YYYY-MM-DD to DD-MM-YYYY for display)
   useEffect(() => {
@@ -176,62 +167,74 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
     }
   }, [filters.auth_date_from, filters.auth_date_to]);
 
-  // Fetch counts whenever filters change
+  // Fetch counts whenever filters change - OPTIMIZED with debounce and AbortController
   useEffect(() => {
-    const params = new URLSearchParams();
-    
-    // Build params for country counts: include service_codes but NOT home_member_states
-    if (filters.search) params.append('search', filters.search);
-    if (filters.auth_date_from) params.append('auth_date_from', filters.auth_date_from);
-    if (filters.auth_date_to) params.append('auth_date_to', filters.auth_date_to);
-    
-    // Include service_codes for country counts (but backend will ignore home_member_states)
-    if (filters.service_codes && filters.service_codes.length > 0) {
-      filters.service_codes.forEach(code => {
-        params.append('service_codes', code);
-      });
+    // Cancel any previous request
+    if (filterCountsAbortControllerRef.current) {
+      filterCountsAbortControllerRef.current.abort();
     }
-    
-    // Fetch country counts (backend ignores home_member_states for country_counts)
-    api.get(`/api/filters/counts?${params.toString()}`)
-      .then(response => {
-        setFilterCounts(prev => ({
-          ...prev,
-          country_counts: response.data?.country_counts || {},
-        }));
-      })
-      .catch(error => {
-        console.error('Error fetching country counts:', error);
-      });
-  }, [filters.search, filters.service_codes, filters.auth_date_from, filters.auth_date_to]);
 
-  // Fetch service counts separately (with home_member_states but without service_codes)
-  useEffect(() => {
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    filterCountsAbortControllerRef.current = abortController;
+
     const params = new URLSearchParams();
-    
-    if (filters.search) params.append('search', filters.search);
+
+    // Add register type
+    params.append('register_type', registerType);
+
+    // Use debounced search for better performance
+    if (debouncedFilterSearch) params.append('search', debouncedFilterSearch);
     if (filters.auth_date_from) params.append('auth_date_from', filters.auth_date_from);
     if (filters.auth_date_to) params.append('auth_date_to', filters.auth_date_to);
-    
-    // Include home_member_states for service counts (but backend will ignore service_codes)
+
+    // Include both home_member_states and service_codes
+    // Backend will handle which to use for which count
     if (filters.home_member_states && filters.home_member_states.length > 0) {
       filters.home_member_states.forEach(state => {
         params.append('home_member_states', state);
       });
     }
-    
-    // Fetch service counts (backend ignores service_codes for service_counts)
-    api.get(`/api/filters/counts?${params.toString()}`)
+
+    if (filters.service_codes && filters.service_codes.length > 0) {
+      filters.service_codes.forEach(code => {
+        params.append('service_codes', code);
+      });
+    }
+
+    // Single request gets both country_counts and service_counts (optimized backend)
+    api.get(`/api/filters/counts?${params.toString()}`, {
+      signal: abortController.signal
+    })
       .then(response => {
-        setFilterCounts(prev => ({
-          ...prev,
-          service_counts: response.data?.service_counts || {},
-        }));
+        // Only update if not aborted
+        if (!abortController.signal.aborted) {
+          setFilterCounts({
+            country_counts: response.data?.country_counts || {},
+            service_counts: response.data?.service_counts || {},
+          });
+        }
       })
       .catch(error => {
-        console.error('Error fetching service counts:', error);
+        // Ignore errors from cancelled requests
+        if (
+          error.name === 'CanceledError' ||
+          error.name === 'AbortError' ||
+          error.code === 'ERR_CANCELED' ||
+          abortController.signal.aborted
+        ) {
+          return;
+        }
+        console.error('Error fetching filter counts:', error);
       });
-  }, [filters.search, filters.home_member_states, filters.auth_date_from, filters.auth_date_to]);
+
+    // Cleanup function
+    return () => {
+      if (abortController) {
+        abortController.abort();
+      }
+    };
+  }, [registerType, debouncedFilterSearch, filters.home_member_states, filters.service_codes, filters.auth_date_from, filters.auth_date_to]);
 
   // Close details when clicking outside
   useEffect(() => {
@@ -489,7 +492,8 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
 
           {/* Filter Pills Row */}
           <div className="flex flex-wrap gap-3">
-            {/* Authorisation Date Filter */}
+            {/* Authorisation Date Filter - hidden for OTHER register */}
+            {registerType !== 'other' && (
             <details 
               ref={authDateDetailsRef}
               className="relative"
@@ -746,6 +750,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                 )}
               </div>
             </details>
+            )}
 
             {/* Home Member State Filter */}
             <details 
@@ -901,13 +906,13 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                             return (
                               <label
                                 key={`${country.country_code}-${idx}`}
-                                className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
                               >
                                 <input
                                   type="checkbox"
                                   checked={(filters.home_member_states || []).includes(country.country_code)}
                                   onChange={() => handleHomeMemberStateToggle(country.country_code)}
-                                  className="mt-1 rounded"
+                                  className="rounded"
                                 />
                                 <span className="text-sm flex-1 flex items-center gap-1.5">
                                   <FlagIcon countryCode={country.country_code} size="sm" />
@@ -937,7 +942,8 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
               </div>
             </details>
 
-            {/* Crypto-asset Services Filter */}
+            {/* Crypto-asset Services Filter (CASP only) */}
+            {registerType === 'casp' && (
             <details 
               ref={cryptoServicesDetailsRef}
               className="relative"
@@ -1067,13 +1073,13 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                             return (
                               <label
                                 key={service.code}
-                                className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
                               >
                                 <input
                                   type="checkbox"
                                   checked={(filters.service_codes || []).includes(service.code)}
                                   onChange={() => handleServiceCodeToggle(service.code)}
-                                  className="mt-1 rounded"
+                                  className="rounded"
                                 />
                                 <span className="text-sm flex-1" title={fullDescription}>
                                   {shortName}
@@ -1100,6 +1106,7 @@ export function Filters({ filters, onFiltersChange, onClearFilters, isVisible = 
                 )}
               </div>
             </details>
+            )}
           </div>
         </div>
       )}

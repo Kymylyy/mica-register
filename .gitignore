@@ -5,6 +5,7 @@ __pycache__/
 *.so
 .Python
 venv/
+.venv/
 env/
 ENV/
 *.egg-info/
@@ -13,6 +14,7 @@ build/
 
 # Database
 *.db
+*.db.backup*
 *.sqlite
 *.sqlite3
 
@@ -40,7 +42,8 @@ Thumbs.db
 
 # Environment
 .env
-.env.local
+.env.*
+!.env.example
 
 # Reports and temporary files
 reports/
@@ -51,3 +54,9 @@ reports/
 !railway.json
 
 
+
+# Test coverage
+htmlcov/
+.coverage
+.pytest_cache/
+coverage/

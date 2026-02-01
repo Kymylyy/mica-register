@@ -22,8 +22,11 @@ COPY data/ /app/data/
 # Expose port (Railway will set PORT env variable)
 EXPOSE 8000
 
-# Run the application
-# Railway automatically sets PORT env variable and routes traffic
-# We use shell form to access environment variable
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Make startup script executable (already copied by COPY backend/ .)
+RUN chmod +x /app/start.sh
+
+# Use startup script (runs migrations then starts app)
+# Shell form needed for ${PORT} environment variable expansion
+# Note: start.sh already in /app/ from COPY backend/ . (line 16)
+CMD /app/start.sh
 

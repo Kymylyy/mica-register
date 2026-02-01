@@ -1,8 +1,10 @@
 """
-CSV Cleaning Module for ESMA CASP Register
+CSV Cleaning Module for ESMA MiCA Registers
 
 Automatically fixes detected validation issues in CSV files and produces
 a clean CSV file ready for import. Tracks all changes made for reporting.
+
+Supports all 5 ESMA MiCA registers: CASP, OTHER, ART, EMT, NCASP
 """
 
 import pandas as pd
@@ -18,12 +20,14 @@ from .import_csv import (
     fix_encoding_issues as fix_text_encoding,  # Rename to avoid conflict
     normalize_commercial_name,
     fix_address_website_parsing,
-    merge_entities_by_lei,
     normalize_service_code,
-    MICA_SERVICE_DESCRIPTIONS,
     is_url,
     parse_pipe_separated,
 )
+from .config.constants import MICA_SERVICE_DESCRIPTIONS
+
+# Import register configuration
+from .config.registers import RegisterType, get_register_config
 
 # Import encoding detection from csv_validate
 from .csv_validate import detect_encoding, EncodingInfo
@@ -49,10 +53,12 @@ class Change:
 
 
 class CSVCleaner:
-    """Cleans CSV files by fixing validation issues"""
+    """Cleans CSV files by fixing validation issues for a specific register type"""
 
-    def __init__(self, csv_path: Path):
+    def __init__(self, csv_path: Path, register_type: RegisterType = RegisterType.CASP):
         self.csv_path = csv_path
+        self.register_type = register_type
+        self.config = get_register_config(register_type)
         self.df: Optional[pd.DataFrame] = None
         self.changes: List[Change] = []
         self.encoding_info: Optional[EncodingInfo] = None
@@ -100,8 +106,12 @@ class CSVCleaner:
 
     def fix_whitespace_globally(self) -> None:
         """Fix NBSP, trailing spaces, and normalize whitespace globally"""
-        date_columns = ['ac_authorisationNotificationDate', 'ac_authorisationEndDate', 'ac_lastupdate']
-        
+        # Get date columns dynamically based on register type
+        date_columns = []
+        for csv_col in self.config.column_mapping.keys():
+            if 'date' in csv_col.lower() or 'lastupdate' in csv_col.lower():
+                date_columns.append(csv_col)
+
         for col in self.df.columns:
             for idx, row in self.df.iterrows():
                 value = row.get(col)
@@ -127,13 +137,11 @@ class CSVCleaner:
 
     def fix_encoding_issues(self) -> None:
         """Fix encoding issues in text columns"""
-        text_columns = [
-            'ae_address',
-            'ae_commercial_name',
-            'ae_lei_name',
-            'ac_competentAuthority',
-            'ac_comments'
-        ]
+        # Get text columns dynamically - address, names, comments, etc.
+        text_columns = []
+        for csv_col in self.config.column_mapping.keys():
+            if any(keyword in csv_col.lower() for keyword in ['address', 'name', 'authority', 'comments', 'reason', 'infringement']):
+                text_columns.append(csv_col)
 
         for col in text_columns:
             if col not in self.df.columns:
@@ -156,9 +164,12 @@ class CSVCleaner:
 
     def detect_and_fix_encoding_data_loss(self) -> None:
         """Detect encoding data loss and attempt to fix before reporting"""
-        text_columns = ['ae_address', 'ae_commercial_name', 'ae_lei_name', 
-                       'ac_competentAuthority', 'ac_comments', 'ae_website']
-        
+        # Get text columns dynamically
+        text_columns = []
+        for csv_col in self.config.column_mapping.keys():
+            if any(keyword in csv_col.lower() for keyword in ['address', 'name', 'authority', 'comments', 'website', 'url', 'reason', 'infringement']):
+                text_columns.append(csv_col)
+
         for col in text_columns:
             if col not in self.df.columns:
                 continue
@@ -200,10 +211,14 @@ class CSVCleaner:
                             # Leave original value - don't modify
 
     def normalize_country_codes(self) -> None:
-        """Normalize country codes: strip, upper, map EL->GR, dedup"""
+        """Normalize country codes: strip, upper, map EL->GR, dedup (CASP only)"""
+        # Only for CASP register
+        if self.register_type != RegisterType.CASP:
+            return
+
         if 'ac_serviceCode_cou' not in self.df.columns:
             return
-        
+
         for idx, row in self.df.iterrows():
             value = row.get('ac_serviceCode_cou')
             if pd.notna(value) and str(value).strip():
@@ -239,8 +254,12 @@ class CSVCleaner:
 
     def fix_dates(self) -> None:
         """Fix date format issues using parse_date() function"""
-        date_columns = ['ac_authorisationNotificationDate', 'ac_authorisationEndDate', 'ac_lastupdate']
-        
+        # Get date columns dynamically based on register config
+        date_columns = []
+        for csv_col in self.config.column_mapping.keys():
+            if 'date' in csv_col.lower() or 'lastupdate' in csv_col.lower():
+                date_columns.append(csv_col)
+
         for col in date_columns:
             if col not in self.df.columns:
                 continue
@@ -249,13 +268,13 @@ class CSVCleaner:
                 date_str = row.get(col)
                 if pd.notna(date_str) and str(date_str).strip():
                     original = str(date_str).strip()
-                    
-                    # Try to parse using existing parse_date() function
-                    parsed_date = parse_date(original)
-                    
+
+                    # Try to parse using existing parse_date() function with register-specific format
+                    parsed_date = parse_date(original, self.config.date_format)
+
                     if parsed_date:
-                        # Format back to DD/MM/YYYY (keep original format)
-                        formatted = parsed_date.strftime('%d/%m/%Y')
+                        # Format back to register-specific format
+                        formatted = parsed_date.strftime(self.config.date_format)
                         if formatted != original:
                             self.df.at[idx, col] = formatted
                             self.changes.append(Change(
@@ -280,9 +299,16 @@ class CSVCleaner:
     def fix_multiline_fields(self) -> None:
         """Fix multiline fields with better handling for websites"""
         # Handle website separately with URL deduplication
-        if 'ae_website' in self.df.columns:
+        # Find website column dynamically
+        website_col = None
+        for col in self.df.columns:
+            if 'website' in col.lower() or 'url' in col.lower():
+                website_col = col
+                break
+
+        if website_col and website_col in self.df.columns:
             for idx, row in self.df.iterrows():
-                value = row.get('ae_website')
+                value = row.get(website_col)
                 if pd.notna(value):
                     original = str(value)
                     if '\n' in original or '\r' in original:
@@ -303,20 +329,25 @@ class CSVCleaner:
                                 if part not in seen:
                                     seen.add(part)
                                     urls.append(part)
-                        
+
                         fixed = '|'.join(urls) if urls else ' '.join(parts)
                         if fixed != original:
-                            self.df.at[idx, 'ae_website'] = fixed
+                            self.df.at[idx, website_col] = fixed
                             self.changes.append(Change(
                                 type="MULTILINE_WEBSITE_FIXED",
                                 row=idx + 2,
-                                column="ae_website",
+                                column=website_col,
                                 old_value=original[:100],
                                 new_value=fixed[:100]
                             ))
-        
+
         # Handle other multiline fields (address, comments) with space replacement
-        text_columns = ['ae_address', 'ac_comments']
+        # Find dynamically based on column names
+        text_columns = []
+        for col in self.df.columns:
+            if any(keyword in col.lower() for keyword in ['address', 'comments', 'reason']):
+                text_columns.append(col)
+
         for col in text_columns:
             if col not in self.df.columns:
                 continue
@@ -439,25 +470,6 @@ class CSVCleaner:
                 ))
                 # Leave original value - don't modify (import_csv.py will handle)
 
-    def merge_duplicate_lei(self) -> None:
-        """Merge rows with duplicate LEI codes"""
-        if self.df is None:
-            return
-
-        initial_count = len(self.df)
-        self.df = merge_entities_by_lei(self.df)
-        final_count = len(self.df)
-
-        merged_count = initial_count - final_count
-        if merged_count > 0:
-            self.changes.append(Change(
-                type="DUPLICATE_LEI_MERGED",
-                row=0,  # Not specific to one row
-                column="",
-                old_value=f"{initial_count} rows",
-                new_value=f"{final_count} rows ({merged_count} merged)"
-            ))
-
     def fix_address_website_parsing(self) -> None:
         """Fix address/website parsing issues"""
         if 'ae_address' not in self.df.columns or 'ae_website' not in self.df.columns:
@@ -490,7 +502,11 @@ class CSVCleaner:
                 ))
 
     def normalize_service_codes(self) -> None:
-        """Normalize service codes to standard format"""
+        """Normalize service codes to standard format (CASP only)"""
+        # Only for CASP register
+        if self.register_type != RegisterType.CASP:
+            return
+
         if 'ac_serviceCode' not in self.df.columns:
             return
 
@@ -574,9 +590,9 @@ class CSVCleaner:
         print("Fixing LEI format...")
         self.fix_lei_format()
         
-        # 8. Merge duplicate LEI
-        print("Merging duplicate LEI...")
-        self.merge_duplicate_lei()
+        # 8. [REMOVED] Merge duplicate LEI - preserving all rows
+        # Duplicate LEI codes are now allowed (e.g., OTHER: one LEI, many white papers)
+        print("Skipping duplicate LEI merge (preserving all rows)...")
         
         # 9. Fix address/website parsing
         print("Fixing address/website parsing...")

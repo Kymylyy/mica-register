@@ -139,28 +139,28 @@ def test_fix_lei_excel_notation(temp_csv_file):
         csv_path.unlink()
 
 
-def test_merge_duplicate_lei(temp_csv_file):
-    """Test that duplicate LEI rows are merged"""
+def test_merge_duplicate_lei_disabled(temp_csv_file):
+    """Test that duplicate LEI rows are NOT merged (all rows preserved)"""
     csv_content = """ae_lei,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
 5299005V5GBSN2A4C303,a. providing custody,BE|FR,01/01/2025,01/01/2025
 5299005V5GBSN2A4C303,b. trading platform,DE|IT,01/01/2025,01/01/2025"""
     csv_path = temp_csv_file(csv_content)
-    
+
     try:
         cleaner = CSVCleaner(csv_path)
         cleaner.load_csv()
         initial_count = len(cleaner.df)
-        cleaner.merge_duplicate_lei()
+
+        # Run full cleaning pipeline
+        cleaner.fix_all_issues()
         final_count = len(cleaner.df)
-        
-        # Should have merged 2 rows into 1
-        assert final_count < initial_count
-        assert final_count == 1
-        
-        # Check that services were merged
-        merged_services = cleaner.df.iloc[0]['ac_serviceCode']
-        assert "a. providing custody" in merged_services
-        assert "b. trading platform" in merged_services
+
+        # Should NOT merge - both rows preserved
+        assert final_count == initial_count == 2
+
+        # Check that no DUPLICATE_LEI_MERGED change was recorded
+        merge_changes = [c for c in cleaner.changes if c.type == "DUPLICATE_LEI_MERGED"]
+        assert len(merge_changes) == 0
     finally:
         csv_path.unlink()
 

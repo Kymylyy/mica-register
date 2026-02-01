@@ -14,7 +14,7 @@ charset-normalizer>=3.0.0
 pytest>=7.0.0
 
 # LLM Remediation
-google-genai>=1.56.0
+openai>=1.30.0
 python-dotenv>=1.0.0
 
 # Web Scraping

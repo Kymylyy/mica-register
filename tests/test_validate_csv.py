@@ -76,9 +76,9 @@ INVALID123,a. providing custody,BE|FR,01/01/2025,01/01/2025
 
 def test_duplicate_lei(temp_csv_file):
     """Test that duplicate LEI produces LEI_DUPLICATE warning"""
-    csv_content = """ae_lei,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
-5299005V5GBSN2A4C303,a. providing custody,BE|FR,01/01/2025,01/01/2025
-5299005V5GBSN2A4C303,b. trading platform,DE|IT,01/01/2025,01/01/2025"""
+    csv_content = """ae_competentAuthority,ae_lei,ae_lei_name,ae_homeMemberState,ae_lei_cou_code,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
+BaFin,5299005V5GBSN2A4C303,Test Company Ltd,DE,DE,a. providing custody,BE|FR,01/01/2025,01/01/2025
+BaFin,5299005V5GBSN2A4C303,Test Company Ltd,DE,DE,b. trading platform,DE|IT,01/01/2025,01/01/2025"""
     csv_path = temp_csv_file(csv_content)
     
     try:
@@ -141,8 +141,8 @@ INCOMPLETE,ROW"""
 
 def test_invalid_country_code(temp_csv_file):
     """Test that invalid country code produces COUNTRY_CODE_INVALID error"""
-    csv_content = """ae_lei,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
-5299005V5GBSN2A4C303,a. providing custody,XX|YY,01/01/2025,01/01/2025"""
+    csv_content = """ae_competentAuthority,ae_lei,ae_lei_name,ae_homeMemberState,ae_lei_cou_code,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
+BaFin,5299005V5GBSN2A4C303,Test Company Ltd,DE,DE,a. providing custody,XX|YY,01/01/2025,01/01/2025"""
     csv_path = temp_csv_file(csv_content)
     
     try:
@@ -160,8 +160,8 @@ def test_invalid_country_code(temp_csv_file):
 
 def test_service_code_with_description(temp_csv_file):
     """Test that service code with description is valid (no error)"""
-    csv_content = """ae_lei,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
-5299005V5GBSN2A4C303,a. providing custody and administration of crypto-assets on behalf of clients,BE|FR,01/01/2025,01/01/2025"""
+    csv_content = """ae_competentAuthority,ae_lei,ae_lei_name,ae_homeMemberState,ae_lei_cou_code,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
+BaFin,5299005V5GBSN2A4C303,Test Company Ltd,DE,DE,a. providing custody and administration of crypto-assets on behalf of clients,BE|FR,01/01/2025,01/01/2025"""
     csv_path = temp_csv_file(csv_content)
     
     try:
@@ -177,8 +177,8 @@ def test_service_code_with_description(temp_csv_file):
 
 def test_encoding_suspect(temp_csv_file):
     """Test that encoding suspect patterns produce ENCODING_SUSPECT warning"""
-    csv_content = """ae_lei,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate,ae_address
-5299005V5GBSN2A4C303,a. providing custody,BE|FR,01/01/2025,01/01/2025,StraÃŸe 7"""
+    csv_content = """ae_competentAuthority,ae_lei,ae_lei_name,ae_homeMemberState,ae_lei_cou_code,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate,ae_address
+BaFin,5299005V5GBSN2A4C303,Test Company Ltd,DE,DE,a. providing custody,BE|FR,01/01/2025,01/01/2025,StraÃŸe 7"""
     csv_path = temp_csv_file(csv_content)
     
     try:
@@ -282,9 +282,9 @@ Austrian FMA,AT"""
 
 def test_cli_exit_code_duplicate_lei(temp_csv_file):
     """Test CLI exit code for duplicate LEI (should be 1 - warning only)"""
-    csv_content = """ae_lei,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
-5299005V5GBSN2A4C303,a. providing custody,BE|FR,01/01/2025,01/01/2025
-5299005V5GBSN2A4C303,b. trading platform,DE|IT,01/01/2025,01/01/2025"""
+    csv_content = """ae_competentAuthority,ae_lei,ae_lei_name,ae_homeMemberState,ae_lei_cou_code,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
+BaFin,5299005V5GBSN2A4C303,Test Company Ltd,DE,DE,a. providing custody,BE|FR,01/01/2025,01/01/2025
+BaFin,5299005V5GBSN2A4C303,Test Company Ltd,DE,DE,b. trading platform,DE|IT,01/01/2025,01/01/2025"""
     csv_path = temp_csv_file(csv_content)
     
     try:
@@ -301,9 +301,9 @@ def test_cli_exit_code_duplicate_lei(temp_csv_file):
 
 def test_cli_exit_code_strict_mode(temp_csv_file):
     """Test CLI exit code in strict mode (warnings treated as errors)"""
-    csv_content = """ae_lei,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
-5299005V5GBSN2A4C303,a. providing custody,BE|FR,01/12/.2025,01/01/2025
-5299005V5GBSN2A4C303,b. trading platform,DE|IT,01/01/2025,01/01/2025"""
+    csv_content = """ae_competentAuthority,ae_lei,ae_lei_name,ae_homeMemberState,ae_lei_cou_code,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
+BaFin,5299005V5GBSN2A4C303,Test Company Ltd,DE,DE,a. providing custody,BE|FR,01/12/.2025,01/01/2025
+BaFin,5299005V5GBSN2A4C303,Test Company Ltd,DE,DE,b. trading platform,DE|IT,01/01/2025,01/01/2025"""
     csv_path = temp_csv_file(csv_content)
     
     try:
@@ -320,8 +320,8 @@ def test_cli_exit_code_strict_mode(temp_csv_file):
 
 def test_cli_json_report(temp_csv_file):
     """Test CLI JSON report generation"""
-    csv_content = """ae_lei,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
-5299005V5GBSN2A4C303,a. providing custody,BE|FR,01/01/2025,01/01/2025"""
+    csv_content = """ae_competentAuthority,ae_lei,ae_lei_name,ae_homeMemberState,ae_lei_cou_code,ac_serviceCode,ac_serviceCode_cou,ac_authorisationNotificationDate,ac_lastupdate
+BaFin,5299005V5GBSN2A4C303,Test Company Ltd,DE,DE,a. providing custody,BE|FR,01/01/2025,01/01/2025"""
     csv_path = temp_csv_file(csv_content)
     
     try:
