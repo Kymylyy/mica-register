@@ -12,9 +12,12 @@ import { getServiceDescription, getServiceShortName, getServiceDescriptionCapita
 import { useDebounce } from './utils/debounce';
 import { COUNTRY_NAMES } from './utils/countryNames';
 
+const PAGE_SIZE = 100;
+
 function App({ registerType = 'casp' }) {
   const [entities, setEntities] = useState([]);
   const [count, setCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [filters, setFilters] = useState({});
@@ -45,6 +48,8 @@ function App({ registerType = 'casp' }) {
 
       // Add register type
       params.append('register_type', registerType);
+      params.append('limit', String(PAGE_SIZE));
+      params.append('skip', String((currentPage - 1) * PAGE_SIZE));
 
       // Use debounced search value instead of direct filters.search
       if (searchValue) params.append('search', searchValue);
@@ -61,22 +66,15 @@ function App({ registerType = 'casp' }) {
       if (filters.auth_date_from) params.append('auth_date_from', filters.auth_date_from);
       if (filters.auth_date_to) params.append('auth_date_to', filters.auth_date_to);
 
-      // Batch parallel API requests for better performance
-      const [entitiesRes, countRes] = await Promise.all([
-        api.get(`/api/entities?${params.toString()}&limit=1000`, {
-          signal: abortController.signal
-        }),
-        api.get(`/api/entities/count?${params.toString()}`, {
-          signal: abortController.signal
-        }),
-      ]);
+      const entitiesRes = await api.get(`/api/entities?${params.toString()}`, {
+        signal: abortController.signal
+      });
 
       // Only update state if this request wasn't cancelled
       if (!abortController.signal.aborted) {
         // API now returns paginated response with items array
-        setEntities(entitiesRes.data.items || entitiesRes.data);
-        // Use total from paginated response, fallback to separate count endpoint
-        setCount(entitiesRes.data.total !== undefined ? entitiesRes.data.total : countRes.data.count);
+        setEntities(entitiesRes.data.items || []);
+        setCount(entitiesRes.data.total !== undefined ? entitiesRes.data.total : 0);
       }
     } catch (error) {
       // Ignore errors from cancelled requests
@@ -97,7 +95,7 @@ function App({ registerType = 'casp' }) {
         setLoading(false);
       }
     }
-  }, [filters, debouncedSearch, registerType]);
+  }, [filters, debouncedSearch, registerType, currentPage]);
 
   // Cleanup abort controller on unmount
   useEffect(() => {
@@ -125,6 +123,7 @@ function App({ registerType = 'casp' }) {
     // Reset filters when register type changes
     // The filters effect below will handle fetching with new registerType
     setFilters({});
+    setCurrentPage(1);
     setSelectedEntity(null);
   }, [registerType]);
 
@@ -137,14 +136,16 @@ function App({ registerType = 'casp' }) {
     // Fetch with debounced search - AbortController will cancel any previous request
     // Show loading for better UX
     fetchEntities(true);
-  }, [debouncedSearch, filters.home_member_states, filters.service_codes, filters.auth_date_from, filters.auth_date_to, fetchEntities]);
+  }, [debouncedSearch, filters.home_member_states, filters.service_codes, filters.auth_date_from, filters.auth_date_to, fetchEntities, currentPage]);
 
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
+    setCurrentPage(1);
   };
 
   const handleClearFilters = () => {
     setFilters({});
+    setCurrentPage(1);
   };
 
   const handleRowClick = (entity) => {
@@ -154,6 +155,16 @@ function App({ registerType = 'casp' }) {
   const handleCloseDetails = () => {
     setSelectedEntity(null);
   };
+
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const startItem = count === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const endItem = count === 0 ? 0 : Math.min((currentPage - 1) * PAGE_SIZE + entities.length, count);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
 
   // Keyboard navigation
@@ -293,6 +304,38 @@ function App({ registerType = 'casp' }) {
           {entities.length > 0 && (
             <div className="transition-opacity duration-300 ease-in-out">
               <DataTable data={entities} onRowClick={handleRowClick} count={count} registerType={registerType} />
+              <div className="mt-4 mb-2 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="text-sm text-gray-600">
+                  Showing {startItem}-{endItem} of {count}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentPage(prev => Math.max(1, prev - 1));
+                      setSelectedEntity(null);
+                    }}
+                    disabled={loading || currentPage <= 1}
+                    className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-gray-700 min-w-[90px] text-center">
+                    Page {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                      setSelectedEntity(null);
+                    }}
+                    disabled={loading || currentPage >= totalPages}
+                    className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
               {loading && (
                 <div className="absolute top-0 right-0 mt-2 mr-4 z-10">
                   <div className="bg-white rounded-lg shadow-md px-3 py-2 flex items-center gap-2 text-sm text-gray-600 border border-gray-200">
