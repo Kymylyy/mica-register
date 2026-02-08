@@ -8,11 +8,30 @@ import { RegisterSelector } from './components/RegisterSelector';
 import { FlagIcon } from './components/FlagIcon';
 import { ContactPill } from './components/ContactPill';
 import { formatDate, copyToClipboard } from './utils/modalUtils';
-import { getServiceDescription, getServiceShortName, getServiceDescriptionCapitalized, getServiceCodeOrder, getServiceMediumName } from './utils/serviceDescriptions';
+import { getServiceCodeOrder, getServiceMediumName } from './utils/serviceDescriptions';
 import { useDebounce } from './utils/debounce';
 import { COUNTRY_NAMES } from './utils/countryNames';
 
 const PAGE_SIZE = 100;
+
+function formatHeaderDate(isoDate) {
+  if (!isoDate) return 'N/A';
+
+  const parts = isoDate.split('-');
+  if (parts.length !== 3) return 'N/A';
+
+  const [year, month, day] = parts.map(Number);
+  if (!year || !month || !day) return 'N/A';
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const monthName = monthNames[month - 1];
+  if (!monthName) return 'N/A';
+
+  return `${day} ${monthName} ${year}`;
+}
 
 function App({ registerType = 'casp' }) {
   const [entities, setEntities] = useState([]);
@@ -23,6 +42,7 @@ function App({ registerType = 'casp' }) {
   const [filters, setFilters] = useState({});
   const [copyFeedback, setCopyFeedback] = useState(null);
   const [filtersVisible, setFiltersVisible] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const modalRef = useRef(null);
   const isInitialMount = useRef(true);
   const abortControllerRef = useRef(null);
@@ -138,6 +158,31 @@ function App({ registerType = 'casp' }) {
     fetchEntities(true);
   }, [debouncedSearch, filters.home_member_states, filters.service_codes, filters.auth_date_from, filters.auth_date_to, fetchEntities, currentPage]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchLastUpdated = async () => {
+      try {
+        const response = await api.get('/api/metadata/last-updated', {
+          params: { register_type: registerType },
+        });
+        if (!cancelled) {
+          setLastUpdated(response.data?.last_updated || null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error fetching last updated metadata:', error);
+          setLastUpdated(null);
+        }
+      }
+    };
+
+    fetchLastUpdated();
+    return () => {
+      cancelled = true;
+    };
+  }, [registerType]);
+
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
     setCurrentPage(1);
@@ -230,7 +275,7 @@ function App({ registerType = 'casp' }) {
                   >
                     available here
                   </a>
-                  {' '}• Last updated: 30 January 2026
+                  {' '}• Last updated: {formatHeaderDate(lastUpdated)}
                 </p>
               </div>
 
