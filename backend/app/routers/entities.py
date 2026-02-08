@@ -11,7 +11,14 @@ from ..models import (
     entity_service, casp_entity_service,  # Legacy and new association tables
     CaspEntity, OtherEntity, ArtEntity, EmtEntity, NcaspEntity
 )
-from ..schemas import Entity as EntitySchema, EntityTag as EntityTagSchema, TagCreate, EntityUpdate, PaginatedResponse
+from ..schemas import (
+    Entity as EntitySchema,
+    EntityTag as EntityTagSchema,
+    TagCreate,
+    EntityUpdate,
+    PaginatedResponse,
+    LastUpdatedResponse,
+)
 from ..config.registers import RegisterType
 from ..config.constants import (
     MICA_SERVICE_DESCRIPTIONS,
@@ -298,6 +305,46 @@ def get_entities_count(
 
     count = query.count()
     return {"count": count}
+
+
+@router.get("/metadata/last-updated", response_model=LastUpdatedResponse)
+def get_last_updated(
+    register_type: RegisterType = Query(RegisterType.CASP, description="Register type"),
+    db: Session = Depends(get_db)
+):
+    """Get latest update date for a single register."""
+    if register_type in (RegisterType.CASP, RegisterType.NCASP):
+        latest_update = db.query(func.max(Entity.last_update)).filter(
+            Entity.register_type == register_type
+        ).scalar()
+    elif register_type == RegisterType.OTHER:
+        latest_update = db.query(
+            func.max(func.coalesce(OtherEntity.white_paper_last_update, Entity.last_update))
+        ).select_from(Entity).outerjoin(
+            OtherEntity, OtherEntity.id == Entity.id
+        ).filter(
+            Entity.register_type == register_type
+        ).scalar()
+    elif register_type == RegisterType.ART:
+        latest_update = db.query(
+            func.max(func.coalesce(ArtEntity.white_paper_last_update, Entity.last_update))
+        ).select_from(Entity).outerjoin(
+            ArtEntity, ArtEntity.id == Entity.id
+        ).filter(
+            Entity.register_type == register_type
+        ).scalar()
+    elif register_type == RegisterType.EMT:
+        latest_update = db.query(
+            func.max(func.coalesce(EmtEntity.white_paper_last_update, Entity.last_update))
+        ).select_from(Entity).outerjoin(
+            EmtEntity, EmtEntity.id == Entity.id
+        ).filter(
+            Entity.register_type == register_type
+        ).scalar()
+    else:
+        latest_update = None
+
+    return LastUpdatedResponse(register_type=register_type.value, last_updated=latest_update)
 
 
 @router.get("/entities/{entity_id}", response_model=EntitySchema)
@@ -728,4 +775,3 @@ def import_all_registers(
             status_code=500,
             detail=f"Error importing all registers: {str(e)}"
         )
-

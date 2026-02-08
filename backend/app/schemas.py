@@ -144,3 +144,8 @@ class PaginatedResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class LastUpdatedResponse(BaseModel):
+    """Per-register latest update date used by frontend header."""
+    register_type: RegisterTypeEnum
+    last_updated: Optional[date] = None
