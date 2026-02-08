@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+import os
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_, and_, func, distinct, exists, select
 from typing import List, Optional
 from datetime import date
@@ -19,6 +21,51 @@ from ..config.constants import (
 )
 
 router = APIRouter()
+
+
+ENTITY_EAGER_LOAD_OPTIONS = [
+    selectinload(Entity.tags),
+    selectinload(Entity.services),
+    selectinload(Entity.passport_countries),
+    selectinload(Entity.casp_entity).selectinload(CaspEntity.services),
+    selectinload(Entity.casp_entity).selectinload(CaspEntity.passport_countries),
+    selectinload(Entity.other_entity),
+    selectinload(Entity.art_entity),
+    selectinload(Entity.emt_entity),
+    selectinload(Entity.ncasp_entity),
+]
+
+
+def require_admin_token(authorization: Optional[str] = Header(None)) -> None:
+    """Require valid Bearer token for admin endpoints."""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header"
+        )
+
+    bearer_prefix = "Bearer "
+    if not authorization.startswith(bearer_prefix):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Authorization header format"
+        )
+
+    provided_token = authorization[len(bearer_prefix):].strip()
+    expected_token = os.getenv("ADMIN_API_TOKEN") or os.getenv("ADMIN_TOKEN")
+
+    if not expected_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin API token is not configured"
+        )
+
+    if provided_token != expected_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid admin token"
+        )
+
 
 def apply_search_filter(query, search: str, register_type: RegisterType = RegisterType.CASP):
     """Apply search filter: commercial name, LEI name, address, website, authority, comments, country names, and service names (CASP only)
@@ -158,7 +205,7 @@ def get_entities(
     Returns:
         PaginatedResponse with items, total count, and pagination info
     """
-    query = db.query(Entity)
+    query = db.query(Entity).options(*ENTITY_EAGER_LOAD_OPTIONS)
 
     # Filter by register type
     query = query.filter(Entity.register_type == register_type)
@@ -256,7 +303,7 @@ def get_entities_count(
 @router.get("/entities/{entity_id}", response_model=EntitySchema)
 def get_entity(entity_id: int, db: Session = Depends(get_db)):
     """Get single entity by ID"""
-    entity = db.query(Entity).filter(Entity.id == entity_id).first()
+    entity = db.query(Entity).options(*ENTITY_EAGER_LOAD_OPTIONS).filter(Entity.id == entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
     return entity
@@ -517,7 +564,10 @@ def update_entity(
 
 
 @router.post("/admin/import")
-def import_data(db: Session = Depends(get_db)):
+def import_data(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_token)
+):
     """Import CSV data for CASP register into database (admin endpoint)
 
     Automatically finds the newest CASP *_clean.csv file in data/cleaned/casp/
@@ -593,7 +643,10 @@ def import_data(db: Session = Depends(get_db)):
 
 
 @router.post("/admin/import-all")
-def import_all_registers(db: Session = Depends(get_db)):
+def import_all_registers(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_token)
+):
     """Import CSV data for ALL registers into database (admin endpoint)
 
     Automatically finds the newest *_clean.csv file in data/cleaned/{register}/
@@ -675,5 +728,4 @@ def import_all_registers(db: Session = Depends(get_db)):
             status_code=500,
             detail=f"Error importing all registers: {str(e)}"
         )
-
 
