@@ -30,8 +30,8 @@ Usage:
     # Drop entire DB before import (DESTRUCTIVE - use with caution!)
     python scripts/update_all_registers.py --all --drop-db
 
-    # Use _clean_llm files explicitly (otherwise auto-detect by date)
-    python scripts/update_all_registers.py --all --use-clean-llm
+    # Prefer _clean files over _clean_llm files
+    python scripts/update_all_registers.py --all --no-use-clean-llm
 """
 
 import sys
@@ -94,6 +94,11 @@ class UpdateResult:
         """Mark as skipped"""
         self.skipped = True
         self.skip_reason = reason
+
+
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+EXIT_ESMA_DATE_UNAVAILABLE = 2
 
 
 def get_esma_update_date() -> Optional[date]:
@@ -236,11 +241,16 @@ def clean_csv(input_path: Path, output_path: Path, dry_run: bool = False) -> boo
         return False
 
 
-def import_to_db(drop_db: bool = False, dry_run: bool = False) -> Tuple[bool, Dict[RegisterType, int]]:
+def import_to_db(
+    drop_db: bool = False,
+    prefer_llm: bool = True,
+    dry_run: bool = False
+) -> Tuple[bool, Dict[RegisterType, int]]:
     """Import all cleaned CSVs to database using import_all_registers.py.
 
     Args:
         drop_db: Whether to drop all tables before import
+        prefer_llm: Whether to prefer _clean_llm files over _clean files
         dry_run: If True, only print what would happen
 
     Returns:
@@ -256,6 +266,10 @@ def import_to_db(drop_db: bool = False, dry_run: bool = False) -> Tuple[bool, Di
         cmd = [sys.executable, "backend/import_all_registers.py"]
         if drop_db:
             cmd.append("--drop-db")
+        if prefer_llm:
+            cmd.append("--use-clean-llm")
+        else:
+            cmd.append("--no-use-clean-llm")
 
         result = subprocess.run(
             cmd,
@@ -327,6 +341,7 @@ def update_frontend_date(update_date: date, dry_run: bool = False) -> bool:
 
 def update_register(
     register_type: RegisterType,
+    esma_date: Optional[date],
     force: bool = False,
     skip_validation: bool = False,
     skip_cleaning: bool = False,
@@ -358,15 +373,22 @@ def update_register(
     # Step 1: Check if update needed
     print("Step 1: Checking for updates...")
 
-    esma_date = get_esma_update_date()
+    effective_date = esma_date
+    if esma_date is None:
+        if force:
+            effective_date = date.today()
+            print("  ⚠️  ESMA update date unavailable, proceeding due to --force")
+            print(f"  Using current date for output files: {effective_date.strftime('%d %B %Y')}")
+        else:
+            result.skip("Could not determine ESMA update date")
+            print("  ⚠️  Skipping register update: ESMA update date unavailable")
+            return result
+
     if esma_date:
         print(f"  ESMA last update: {esma_date.strftime('%d %B %Y')}")
 
-    # Determine filename date (prefer ESMA date when available)
-    if esma_date:
-        file_date_str = esma_date.strftime("%Y%m%d")
-    else:
-        file_date_str = datetime.now().strftime("%Y%m%d")
+    # ESMA date gates filename selection for deterministic runs.
+    file_date_str = effective_date.strftime("%Y%m%d")
 
     # Get latest local raw CSV
     base_dir = get_base_data_dir()
@@ -383,7 +405,7 @@ def update_register(
             print(f"  Latest local file: {latest_raw_file.name} ({latest_local_date.strftime('%d %B %Y')})")
 
             # Check if up to date
-            if esma_date and latest_local_date >= esma_date and not force:
+            if effective_date and latest_local_date >= effective_date and not force:
                 result.skip("Already up to date")
                 print(f"  ℹ️  {register_name.upper()} is up to date (use --force to redownload)")
                 return result
@@ -399,8 +421,8 @@ def update_register(
         )
         if latest_cleaned_file:
             cleaned_date = extract_date_from_filename(latest_cleaned_file.name)
-            if esma_date and cleaned_date:
-                if cleaned_date >= esma_date:
+            if effective_date and cleaned_date:
+                if cleaned_date >= effective_date:
                     print("Step 2: Skipping download (existing cleaned file is up to date)")
                     result.cleaned_file = latest_cleaned_file
                     result.complete_step("download")
@@ -409,14 +431,6 @@ def update_register(
                     result.success = True
                     return result
                 print("Step 2: Existing cleaned file is stale, will download and re-clean")
-            elif esma_date is None:
-                print("Step 2: ESMA update date unavailable, using existing cleaned file")
-                result.cleaned_file = latest_cleaned_file
-                result.complete_step("download")
-                result.complete_step("validate")
-                result.complete_step("clean")
-                result.success = True
-                return result
             else:
                 print("Step 2: Could not determine cleaned file date, will download and re-clean")
 
@@ -616,12 +630,20 @@ def main():
         action="store_true",
         help="Skip cleaning step (use existing cleaned files)"
     )
-    parser.add_argument(
+    llm_group = parser.add_mutually_exclusive_group()
+    llm_group.add_argument(
         "--use-clean-llm",
+        dest="use_clean_llm",
         action="store_true",
-        default=True,
-        help="Prefer _clean_llm files over _clean files (default: True)"
+        help="Prefer _clean_llm files over _clean files"
     )
+    llm_group.add_argument(
+        "--no-use-clean-llm",
+        dest="use_clean_llm",
+        action="store_false",
+        help="Prefer _clean files over _clean_llm files"
+    )
+    parser.set_defaults(use_clean_llm=True)
     parser.add_argument(
         "--drop-db",
         action="store_true",
@@ -674,6 +696,16 @@ def main():
         print("⚠️  DRY RUN MODE - No actual changes will be made")
         print()
 
+    esma_date = get_esma_update_date()
+    if esma_date:
+        print(f"ESMA update date: {esma_date.strftime('%d %B %Y')}")
+    else:
+        print("⚠️  Could not determine ESMA update date")
+        if args.force:
+            print("⚠️  Continuing because --force is enabled")
+        else:
+            print("⚠️  Registers will be skipped (use --force to proceed anyway)")
+
     # Ensure directory structure exists
     ensure_directory_structure()
 
@@ -682,6 +714,7 @@ def main():
     for register_type in registers_to_update:
         result = update_register(
             register_type,
+            esma_date=esma_date,
             force=args.force,
             skip_validation=args.skip_validation,
             skip_cleaning=args.skip_cleaning,
@@ -699,7 +732,11 @@ def main():
         print("Note: Import checks all registers; only updated ones have fresh data")
         print(f"{'='*60}")
 
-        import_success, entity_counts = import_to_db(drop_db=args.drop_db, dry_run=args.dry_run)
+        import_success, entity_counts = import_to_db(
+            drop_db=args.drop_db,
+            prefer_llm=args.use_clean_llm,
+            dry_run=args.dry_run
+        )
 
         if not import_success:
             print("⚠️  Warning: Database import failed")
@@ -716,7 +753,6 @@ def main():
         print("Step 6: Updating frontend date")
         print(f"{'='*60}")
 
-        esma_date = get_esma_update_date()
         if esma_date:
             update_frontend_date(esma_date, dry_run=args.dry_run)
         else:
@@ -735,9 +771,11 @@ def main():
         save_report(results, entity_counts, report_path)
 
     # Return appropriate exit code
+    if esma_date is None and not args.force:
+        return EXIT_ESMA_DATE_UNAVAILABLE
     if any(not r.success and not r.skipped for r in results):
-        return 1
-    return 0
+        return EXIT_FAILURE
+    return EXIT_SUCCESS
 
 
 if __name__ == "__main__":

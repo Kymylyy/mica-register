@@ -41,6 +41,11 @@ python scripts/update_all_registers.py --all --force
 python scripts/update_all_registers.py --all --skip-cleaning
 ```
 
+### Prefer `_clean.csv` over `_clean_llm.csv`
+```bash
+python scripts/update_all_registers.py --all --no-use-clean-llm
+```
+
 ### Dry run (preview only, no changes)
 ```bash
 python scripts/update_all_registers.py --all --dry-run
@@ -135,7 +140,13 @@ This protects against accidental data loss during development and production upd
 
 If you have both `_clean.csv` and `_clean_llm.csv` files for the same date:
 - The system prefers `_clean_llm` by default (LLM-enhanced cleaning)
+- Use `--no-use-clean-llm` to prefer `_clean` files instead
 - For different dates, the newest date always wins regardless of suffix
+
+### ESMA Date Unavailable
+
+If ESMA update date cannot be retrieved, `update_all_registers.py` skips register updates and exits with code `2`.
+This prevents non-deterministic file naming and unintended imports in automated runs (for example cron jobs).
 
 ### Docker Support
 

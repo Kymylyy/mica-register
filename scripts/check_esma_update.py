@@ -5,6 +5,7 @@ Uses Playwright to scrape the last update date from the ESMA website
 and compares it with the latest CSV file in data/cleaned/.
 """
 import sys
+import os
 import re
 from pathlib import Path
 from glob import glob
@@ -16,6 +17,61 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.models import RegisterType
 from app.utils.file_utils import get_latest_csv_for_register, extract_date_from_filename, get_base_data_dir
+
+
+def _parse_last_update_from_text(text):
+    """Parse ESMA 'Last update' date from page text."""
+    if not text:
+        return None
+    match = re.search(
+        r'Last\s*update(?:\s|:|-)*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})',
+        text,
+        re.IGNORECASE
+    )
+    if not match:
+        return None
+
+    day = int(match.group(1))
+    month_name = match.group(2)
+    year = int(match.group(3))
+    month_map = {
+        'january': 1, 'february': 2, 'march': 3, 'april': 4,
+        'may': 5, 'june': 6, 'july': 7, 'august': 8,
+        'september': 9, 'october': 10, 'november': 11, 'december': 12
+    }
+    month = month_map.get(month_name.lower())
+    if not month:
+        return None
+    return datetime(year, month, day)
+
+
+def _strip_html_tags(text):
+    """Return text with HTML tags removed for robust date parsing."""
+    if not text:
+        return ""
+    no_script = re.sub(r"<script[^>]*>.*?</script>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+    no_style = re.sub(r"<style[^>]*>.*?</style>", " ", no_script, flags=re.IGNORECASE | re.DOTALL)
+    no_tags = re.sub(r"<[^>]+>", " ", no_style)
+    return re.sub(r"\s+", " ", no_tags).strip()
+
+
+def _get_playwright_chromium_executables():
+    """Return local Playwright Chromium executable paths, newest first."""
+    cache_dir = Path.home() / "Library" / "Caches" / "ms-playwright"
+    if not cache_dir.exists():
+        return []
+
+    candidates = [
+        "chromium_headless_shell-*/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+        "chromium_headless_shell-*/chrome-headless-shell-mac-x64/chrome-headless-shell",
+        "chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
+    ]
+    results = []
+    for pattern in candidates:
+        matches = sorted(cache_dir.glob(pattern), reverse=True)
+        for match in matches:
+            results.append(str(match))
+    return results
 
 
 def get_latest_csv_date(register_type: RegisterType = RegisterType.CASP, quiet=False):
@@ -60,16 +116,55 @@ def get_esma_update_date(quiet=False):
     """
     url = "https://www.esma.europa.eu/esmas-activities/digital-finance-and-innovation/markets-crypto-assets-regulation-mica#InterimMiCARegister"
     
+    # Fast path: fetch static HTML first (works in cron/sandbox without browser).
+    try:
+        import requests
+        response = requests.get(
+            url,
+            timeout=30,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; MiCARegisterUpdater/1.0)"}
+        )
+        response.raise_for_status()
+        parsed_date = _parse_last_update_from_text(response.text)
+        if not parsed_date:
+            parsed_date = _parse_last_update_from_text(_strip_html_tags(response.text))
+        if parsed_date:
+            if not quiet:
+                print("Found ESMA update date via direct HTTP fetch.")
+            return parsed_date
+    except Exception as request_error:
+        if not quiet:
+            print(f"Direct HTTP fetch failed: {request_error}")
+
+    use_playwright_fallback = os.getenv("ESMA_USE_PLAYWRIGHT_FALLBACK", "0").lower() in {"1", "true", "yes"}
+    if not use_playwright_fallback:
+        if not quiet:
+            print("Skipping Playwright fallback (set ESMA_USE_PLAYWRIGHT_FALLBACK=1 to enable).")
+        return None
+
     with sync_playwright() as p:
         # Launch browser (headless by default)
         try:
             browser = p.chromium.launch(headless=True)
         except Exception as e:
-            if not quiet:
-                print(f"Error launching browser: {e}")
-                print("\nIf this is your first time using Playwright, you may need to install browsers:")
-                print("  python3 -m playwright install chromium")
-            return None
+            browser = None
+            fallback_executables = _get_playwright_chromium_executables()
+            for fallback_executable in fallback_executables:
+                try:
+                    if not quiet:
+                        print(f"Default Playwright launch failed; trying fallback: {fallback_executable}")
+                    browser = p.chromium.launch(headless=True, executable_path=fallback_executable)
+                    break
+                except Exception as fallback_error:
+                    if not quiet:
+                        print(f"Fallback launch failed: {fallback_error}")
+                    browser = None
+            if browser is None:
+                if not quiet:
+                    print(f"Error launching browser: {e}")
+                    print("\nIf this is your first time using Playwright, you may need to install browsers:")
+                    print("  python3 -m playwright install chromium")
+                return None
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
@@ -133,30 +228,11 @@ def get_esma_update_date(quiet=False):
                 return None
             
             # Parse the date from the text
-            # Format: "Last update: 23 December 2025" or "Last update: 23 December 2025"
-            date_match = re.search(r'(\d{1,2})\s+(\w+)\s+(\d{4})', last_update_text)
-            if not date_match:
+            esma_date = _parse_last_update_from_text(last_update_text)
+            if not esma_date:
                 if not quiet:
                     print(f"Could not parse date from text: {last_update_text}")
                 return None
-            
-            day = int(date_match.group(1))
-            month_name = date_match.group(2)
-            year = int(date_match.group(3))
-            
-            # Convert month name to number
-            month_map = {
-                'january': 1, 'february': 2, 'march': 3, 'april': 4,
-                'may': 5, 'june': 6, 'july': 7, 'august': 8,
-                'september': 9, 'october': 10, 'november': 11, 'december': 12
-            }
-            month = month_map.get(month_name.lower())
-            if not month:
-                if not quiet:
-                    print(f"Unknown month name: {month_name}")
-                return None
-            
-            esma_date = datetime(year, month, day)
             return esma_date
             
         except Exception as e:
