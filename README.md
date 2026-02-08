@@ -460,6 +460,7 @@ The CSV import process follows a multi-stage pipeline:
    - In Railway project settings, add:
      - `CORS_ORIGINS` = Your Vercel frontend URL (e.g., `https://your-app.vercel.app`)
      - `DATABASE_URL` = Automatically set by Railway PostgreSQL service
+     - `ADMIN_API_TOKEN` = Strong random token used to authorize admin import endpoints
 
 5. **Deploy**
    - Railway will automatically build from Dockerfile and deploy
@@ -488,6 +489,7 @@ After deployment, import data to production database:
    ```bash
    # Call Railway import endpoint
    curl -X POST https://your-app.railway.app/api/admin/import \
+     -H "Authorization: Bearer $ADMIN_API_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"register_type": "all"}'
    ```
@@ -495,6 +497,7 @@ After deployment, import data to production database:
    Or import specific register:
    ```bash
    curl -X POST https://your-app.railway.app/api/admin/import \
+     -H "Authorization: Bearer $ADMIN_API_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"register_type": "casp"}'
    ```
