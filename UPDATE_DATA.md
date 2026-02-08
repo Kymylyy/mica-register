@@ -15,7 +15,7 @@ This will:
 2. ✅ Download new CSVs (if needed)
 3. ✅ Validate and clean data
 4. ✅ Import to database (non-destructive by default)
-5. ✅ Update frontend date
+5. ✅ Save structured report for automation/logging
 
 Done! Review the summary and commit changes.
 
@@ -148,6 +148,19 @@ If you have both `_clean.csv` and `_clean_llm.csv` files for the same date:
 If ESMA update date cannot be retrieved, `update_all_registers.py` skips register updates and exits with code `2`.
 This prevents non-deterministic file naming and unintended imports in automated runs (for example cron jobs).
 
+### Railway Cron Runner
+
+For Railway cron services, use:
+
+```bash
+python scripts/run_railway_cron_update.py
+```
+
+The runner executes `update_all_registers.py --all --report /tmp/update_report.json`,
+prints a concise `[cron]` summary, and returns:
+- `0` when pipeline completed (new data or no changes)
+- non-zero when the pipeline fails
+
 ### Docker Support
 
 All scripts automatically detect if running in Docker and adjust paths accordingly:
@@ -218,3 +231,15 @@ For production deployments:
 
 The production import endpoint (`/api/admin/import`) is separate and currently CASP-only.
 For multi-register production updates, use the CLI scripts described above.
+
+## Railway Cron Setup (Every 6 Hours)
+
+1. Create a dedicated Railway service (separate from web backend) from the same repo.
+2. Set Start Command to:
+   ```bash
+   python scripts/run_railway_cron_update.py
+   ```
+3. Set schedule to:
+   - `0 */6 * * *`
+4. Set `DATABASE_URL` to the same PostgreSQL service used by backend API.
+5. Trigger one manual run and verify Railway logs contain `[cron] Update summary`.
