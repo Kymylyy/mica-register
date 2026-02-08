@@ -373,16 +373,22 @@ def update_register(
     # Step 1: Check if update needed
     print("Step 1: Checking for updates...")
 
+    effective_date = esma_date
     if esma_date is None:
-        result.skip("Could not determine ESMA update date")
-        print("  ⚠️  Skipping register update: ESMA update date unavailable")
-        return result
+        if force:
+            effective_date = date.today()
+            print("  ⚠️  ESMA update date unavailable, proceeding due to --force")
+            print(f"  Using current date for output files: {effective_date.strftime('%d %B %Y')}")
+        else:
+            result.skip("Could not determine ESMA update date")
+            print("  ⚠️  Skipping register update: ESMA update date unavailable")
+            return result
 
     if esma_date:
         print(f"  ESMA last update: {esma_date.strftime('%d %B %Y')}")
 
     # ESMA date gates filename selection for deterministic runs.
-    file_date_str = esma_date.strftime("%Y%m%d")
+    file_date_str = effective_date.strftime("%Y%m%d")
 
     # Get latest local raw CSV
     base_dir = get_base_data_dir()
@@ -399,7 +405,7 @@ def update_register(
             print(f"  Latest local file: {latest_raw_file.name} ({latest_local_date.strftime('%d %B %Y')})")
 
             # Check if up to date
-            if esma_date and latest_local_date >= esma_date and not force:
+            if effective_date and latest_local_date >= effective_date and not force:
                 result.skip("Already up to date")
                 print(f"  ℹ️  {register_name.upper()} is up to date (use --force to redownload)")
                 return result
@@ -415,8 +421,8 @@ def update_register(
         )
         if latest_cleaned_file:
             cleaned_date = extract_date_from_filename(latest_cleaned_file.name)
-            if esma_date and cleaned_date:
-                if cleaned_date >= esma_date:
+            if effective_date and cleaned_date:
+                if cleaned_date >= effective_date:
                     print("Step 2: Skipping download (existing cleaned file is up to date)")
                     result.cleaned_file = latest_cleaned_file
                     result.complete_step("download")
@@ -694,7 +700,11 @@ def main():
     if esma_date:
         print(f"ESMA update date: {esma_date.strftime('%d %B %Y')}")
     else:
-        print("⚠️  Could not determine ESMA update date; registers will be skipped")
+        print("⚠️  Could not determine ESMA update date")
+        if args.force:
+            print("⚠️  Continuing because --force is enabled")
+        else:
+            print("⚠️  Registers will be skipped (use --force to proceed anyway)")
 
     # Ensure directory structure exists
     ensure_directory_structure()
@@ -761,7 +771,7 @@ def main():
         save_report(results, entity_counts, report_path)
 
     # Return appropriate exit code
-    if esma_date is None:
+    if esma_date is None and not args.force:
         return EXIT_ESMA_DATE_UNAVAILABLE
     if any(not r.success and not r.skipped for r in results):
         return EXIT_FAILURE
