@@ -18,6 +18,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Import all MiCA registers")
     parser.add_argument("--drop-db", action="store_true",
                        help="Drop all tables before import (DESTRUCTIVE!)")
+    llm_group = parser.add_mutually_exclusive_group()
+    llm_group.add_argument(
+        "--use-clean-llm",
+        dest="use_clean_llm",
+        action="store_true",
+        help="Prefer _clean_llm files over _clean files"
+    )
+    llm_group.add_argument(
+        "--no-use-clean-llm",
+        dest="use_clean_llm",
+        action="store_false",
+        help="Prefer _clean files over _clean_llm files"
+    )
+    parser.set_defaults(use_clean_llm=True)
     args = parser.parse_args()
 
     if args.drop_db:
@@ -36,12 +50,13 @@ if __name__ == "__main__":
 
     # Auto-detect latest cleaned CSV for each register
     register_files = {}
+    print(f"File preference: {'_clean_llm' if args.use_clean_llm else '_clean'}")
     for register_type in RegisterType:
         latest_file = get_latest_csv_for_register(
             register_type,
             base_dir,
             file_stage="cleaned",
-            prefer_llm=True  # Prefer _clean_llm if available
+            prefer_llm=args.use_clean_llm
         )
         if latest_file:
             register_files[register_type] = latest_file
