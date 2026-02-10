@@ -9,7 +9,7 @@ from ..database import get_db, engine, Base
 from ..models import (
     Entity, Service, PassportCountry, EntityTag,
     entity_service, casp_entity_service,  # Legacy and new association tables
-    CaspEntity, OtherEntity, ArtEntity, EmtEntity, NcaspEntity
+    CaspEntity, OtherEntity, ArtEntity, EmtEntity, NcaspEntity, RegisterUpdateMetadata
 )
 from ..schemas import (
     Entity as EntitySchema,
@@ -313,6 +313,16 @@ def get_last_updated(
     db: Session = Depends(get_db)
 ):
     """Get latest update date for a single register."""
+    metadata = db.query(RegisterUpdateMetadata).filter(
+        RegisterUpdateMetadata.register_type == register_type
+    ).first()
+    if metadata:
+        return LastUpdatedResponse(
+            register_type=register_type.value,
+            last_updated=metadata.esma_update_date
+        )
+
+    # Backward-compatible fallback for environments without metadata records.
     if register_type in (RegisterType.CASP, RegisterType.NCASP):
         latest_update = db.query(func.max(Entity.last_update)).filter(
             Entity.register_type == register_type
