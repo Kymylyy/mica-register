@@ -404,3 +404,15 @@ class EntityTag(Base):
 
     def __repr__(self):
         return f"<EntityTag(entity_id={self.entity_id}, name={self.tag_name})>"
+
+
+class RegisterUpdateMetadata(Base):
+    """Latest ESMA update date per register."""
+    __tablename__ = "register_update_metadata"
+
+    register_type = Column(
+        SQLEnum(RegisterType, values_callable=lambda x: [e.value for e in x]),
+        primary_key=True,
+        nullable=False
+    )
+    esma_update_date = Column(Date, nullable=False)

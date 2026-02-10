@@ -234,33 +234,25 @@ The built files will be in `frontend/dist/`
 
 ### Automated Update (Recommended)
 
-Use the orchestration script to download the latest data for all registers:
+Use the orchestration script to run the full pipeline for all registers:
 
 ```bash
-# Update all registers
-python scripts/update_esma_data.py --all
+# Full pipeline for all registers
+python scripts/update_all_registers.py --all
 
-# Update specific register
-python scripts/update_esma_data.py --register casp
+# Update selected registers only
+python scripts/update_all_registers.py --registers casp,art,emt
 
-# Force re-download even if file exists
-python scripts/update_esma_data.py --all --force
+# Force re-download and reprocess
+python scripts/update_all_registers.py --all --force
 ```
 
 The script will:
 1. Check ESMA website for the latest update date
 2. Download CSV files for selected registers
-3. Save files to `data/raw/{register}/`
-4. Update frontend "Last updated" date
-
-After download, import the data:
-```bash
-# Import all registers
-python backend/app/import_csv.py --all
-
-# Or import specific register
-python backend/app/import_csv.py --register casp
-```
+3. Validate and clean files
+4. Import all cleaned files into database (non-destructive)
+5. Generate a JSON update report
 
 ### Manual Update
 
@@ -278,7 +270,7 @@ python backend/app/import_csv.py --register casp
 
 3. Import to database:
    ```bash
-   python backend/app/import_csv.py --all
+   python backend/import_all_registers.py
    ```
 
 ## API Endpoints
@@ -301,6 +293,10 @@ python backend/app/import_csv.py --register casp
   - Query params: `register_type`
 - `GET /api/filters/counts` - Get dynamic counts for filter options
   - Query params: `register_type` + filter params
+
+### Metadata
+- `GET /api/metadata/last-updated` - Get latest update date for one register
+  - Query params: `register_type`
 
 ### Tags (Optional)
 - `POST /api/entities/{id}/tags` - Add tag to entity
@@ -469,32 +465,52 @@ The CSV import process follows a multi-stage pipeline:
 6. **Update Frontend Environment Variable**
    - Go back to Vercel and update `VITE_API_URL` with your Railway backend URL
 
+### Railway Cron Service (every 6 hours)
+
+Use a second Railway service for automation (separate from web backend):
+
+1. **Create cron service from the same repository**
+   - Reuse the same Docker image/repo as backend
+   - This service should not expose HTTP traffic
+
+2. **Set start command**
+   - `python scripts/run_railway_cron_update.py`
+
+3. **Set schedule**
+   - `0 */6 * * *` (every 6 hours)
+
+4. **Set environment variable**
+   - `DATABASE_URL` = same PostgreSQL instance as backend API
+
+5. **Verify manually**
+   - Trigger a manual run from Railway UI
+   - Check logs for `[cron]` summary lines and script exit code
+
 ### First Data Import / Updating Production Data
 
 After deployment, import data to production database:
 
-1. **Update local data:**
+1. **Run full update manually (optional smoke test):**
    ```bash
-   python scripts/update_esma_data.py --all
+   python scripts/run_railway_cron_update.py
    ```
 
 2. **Commit and push:**
    ```bash
-   git add data/raw/ frontend/src/App.jsx
+   git add data/ reports/updates/
    git commit -m "Update ESMA data to 29 January 2026"
    git push
    ```
 
-3. **Import to production:**
+3. **Import to production (if you need manual API import):**
    ```bash
-   # Call Railway import endpoint
-   curl -X POST https://your-app.railway.app/api/admin/import \
+   # Import all registers
+   curl -X POST https://your-app.railway.app/api/admin/import-all \
      -H "Authorization: Bearer $ADMIN_API_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"register_type": "all"}'
+     -H "Content-Type: application/json"
    ```
 
-   Or import specific register:
+   Or import CASP only:
    ```bash
    curl -X POST https://your-app.railway.app/api/admin/import \
      -H "Authorization: Bearer $ADMIN_API_TOKEN" \
@@ -550,7 +566,6 @@ To change the entire color scheme, edit the CSS variables in `frontend/src/index
 - **Total: 844 entities**
 
 ### Future Enhancements (Optional)
-- Per-register "Last updated" display
 - Validation and cleaning pipeline for all registers
 - LLM remediation for data quality
 - Cross-register search (find same LEI across registers)

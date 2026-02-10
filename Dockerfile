@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code from backend directory
 COPY backend/ .
 
+# Copy update orchestration scripts (used by Railway cron service)
+COPY scripts/ /app/scripts/
+
 # Copy data directory (contains CSV files)
 COPY data/ /app/data/
 # Import scripts will check data/ directory first, then root for backward compatibility
@@ -29,4 +32,3 @@ RUN chmod +x /app/start.sh
 # Shell form needed for ${PORT} environment variable expansion
 # Note: start.sh already in /app/ from COPY backend/ . (line 16)
 CMD /app/start.sh
-

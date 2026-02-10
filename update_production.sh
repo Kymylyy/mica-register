@@ -1,14 +1,25 @@
 #!/bin/bash
 # Script to import all register data to Railway production
-# Usage: ./update_production.sh YOUR_RAILWAY_URL
+# Usage: ./update_production.sh YOUR_RAILWAY_URL [ADMIN_API_TOKEN]
 
 if [ -z "$1" ]; then
-    echo "Usage: ./update_production.sh YOUR_RAILWAY_URL"
+    echo "Usage: ./update_production.sh YOUR_RAILWAY_URL [ADMIN_API_TOKEN]"
     echo "Example: ./update_production.sh https://your-app.railway.app"
+    echo "Example: ./update_production.sh https://your-app.railway.app your-admin-token"
     exit 1
 fi
 
 RAILWAY_URL=$1
+ADMIN_TOKEN=${2:-${ADMIN_API_TOKEN:-}}
+
+if [ -z "$ADMIN_TOKEN" ]; then
+    echo "Error: ADMIN_API_TOKEN is required."
+    echo "Provide as second argument or environment variable."
+    echo "Example:"
+    echo "  ADMIN_API_TOKEN=your-admin-token ./update_production.sh https://your-app.railway.app"
+    exit 1
+fi
+
 echo "=========================================="
 echo "Importing ALL registers to Railway"
 echo "=========================================="
@@ -23,6 +34,7 @@ echo "Calling import endpoint..."
 # Check if jq is available for pretty printing
 if command -v jq &> /dev/null; then
     curl -X POST "$RAILWAY_URL/api/admin/import-all" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
         -H "Content-Type: application/json" \
         -v \
         | jq .
@@ -30,6 +42,7 @@ else
     # Fallback without jq
     echo "(jq not found - showing raw JSON)"
     curl -X POST "$RAILWAY_URL/api/admin/import-all" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
         -H "Content-Type: application/json" \
         -v
 fi
