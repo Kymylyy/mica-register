@@ -47,6 +47,8 @@ from dataclasses import dataclass, asdict
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.models import RegisterType
+from app.models import RegisterUpdateMetadata
+from app.database import SessionLocal
 from app.config.registers import REGISTER_CSV_URLS, get_register_config
 from app.utils.file_utils import (
     get_latest_csv_for_register,
@@ -337,6 +339,42 @@ def update_frontend_date(update_date: date, dry_run: bool = False) -> bool:
     except Exception as e:
         print(f"  ⚠️  Frontend update error: {e}")
         return False
+
+
+def save_esma_update_metadata(
+    esma_date: Optional[date],
+    updated_registers: List[RegisterType],
+    dry_run: bool = False
+) -> bool:
+    """Persist ESMA update date per successfully updated register."""
+    if not esma_date or not updated_registers:
+        return True
+    if dry_run:
+        print(f"  [DRY RUN] Would persist ESMA date {esma_date.isoformat()} for {len(updated_registers)} registers")
+        return True
+
+    db = SessionLocal()
+    try:
+        for register_type in updated_registers:
+            row = db.query(RegisterUpdateMetadata).filter(
+                RegisterUpdateMetadata.register_type == register_type
+            ).first()
+            if row:
+                row.esma_update_date = esma_date
+            else:
+                db.add(RegisterUpdateMetadata(
+                    register_type=register_type,
+                    esma_update_date=esma_date
+                ))
+        db.commit()
+        print(f"  ✓ Saved ESMA update date ({esma_date.strftime('%d %B %Y')}) to metadata")
+        return True
+    except Exception as e:
+        db.rollback()
+        print(f"  ⚠️  Could not save ESMA update metadata: {e}")
+        return False
+    finally:
+        db.close()
 
 
 def update_register(
@@ -726,6 +764,7 @@ def main():
     # Import to database (if any succeeded)
     entity_counts = {}
     successful_results = [r for r in results if r.success]
+    import_success = True
     if successful_results and not args.dry_run:
         print(f"\n{'='*60}")
         print("Step 5: Importing to database")
@@ -746,6 +785,26 @@ def main():
             if result.success and result.register_type in entity_counts:
                 result.entities_imported = entity_counts[result.register_type]
                 result.complete_step("import")
+
+    if esma_date and not args.dry_run and (import_success or not successful_results):
+        # Persist ESMA date also for "already up-to-date" runs so UI always has
+        # an ESMA-based date, even when no new files are downloaded/imported.
+        metadata_registers = [r.register_type for r in successful_results]
+        if not metadata_registers:
+            metadata_registers = [
+                r.register_type for r in results
+                if r.skipped and r.skip_reason == "Already up to date"
+            ]
+
+        if metadata_registers:
+            print(f"\n{'='*60}")
+            print("Step 5b: Saving ESMA update metadata")
+            print(f"{'='*60}")
+            save_esma_update_metadata(
+                esma_date=esma_date,
+                updated_registers=metadata_registers,
+                dry_run=args.dry_run
+            )
 
     # Update frontend date (if any succeeded)
     if successful_results and not args.dry_run:

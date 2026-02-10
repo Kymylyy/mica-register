@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 
 from backend.app.config.registers import RegisterType
-from backend.app.models import ArtEntity, EmtEntity, Entity, OtherEntity
+from backend.app.models import ArtEntity, EmtEntity, Entity, OtherEntity, RegisterUpdateMetadata
 
 
 def _create_entity(db_session, register_type: RegisterType, last_update: date | None = None) -> Entity:
@@ -59,3 +59,18 @@ def test_last_updated_returns_null_when_register_has_no_data(client):
     payload = response.json()
     assert payload["register_type"] == "art"
     assert payload["last_updated"] is None
+
+
+def test_last_updated_prefers_esma_metadata_over_entity_dates(client, db_session):
+    entity = _create_entity(db_session, RegisterType.NCASP, last_update=date(2025, 12, 16))
+    db_session.add(RegisterUpdateMetadata(
+        register_type=RegisterType.NCASP,
+        esma_update_date=date(2026, 2, 8)
+    ))
+    db_session.commit()
+
+    response = client.get("/api/metadata/last-updated?register_type=ncasp")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["register_type"] == "ncasp"
+    assert payload["last_updated"] == "2026-02-08"
