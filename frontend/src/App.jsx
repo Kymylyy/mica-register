@@ -230,7 +230,7 @@ function App({ registerType = 'casp' }) {
                   >
                     available here
                   </a>
-                  {' '}• Last updated: 30 January 2026
+                  {' '}• Last updated: 09 February 2026
                 </p>
               </div>
 
