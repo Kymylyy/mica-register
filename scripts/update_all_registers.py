@@ -787,24 +787,18 @@ def main():
                 result.complete_step("import")
 
     if esma_date and not args.dry_run and (import_success or not successful_results):
-        # Persist ESMA date also for "already up-to-date" runs so UI always has
-        # an ESMA-based date, even when no new files are downloaded/imported.
-        metadata_registers = [r.register_type for r in successful_results]
-        if not metadata_registers:
-            metadata_registers = [
-                r.register_type for r in results
-                if r.skipped and r.skip_reason == "Already up to date"
-            ]
+        # Persist ESMA date for all register types so API metadata stays
+        # consistent across tabs regardless of per-register import outcomes.
+        metadata_registers = list(RegisterType)
 
-        if metadata_registers:
-            print(f"\n{'='*60}")
-            print("Step 5b: Saving ESMA update metadata")
-            print(f"{'='*60}")
-            save_esma_update_metadata(
-                esma_date=esma_date,
-                updated_registers=metadata_registers,
-                dry_run=args.dry_run
-            )
+        print(f"\n{'='*60}")
+        print("Step 5b: Saving ESMA update metadata")
+        print(f"{'='*60}")
+        save_esma_update_metadata(
+            esma_date=esma_date,
+            updated_registers=metadata_registers,
+            dry_run=args.dry_run
+        )
 
     # Update frontend date (if any succeeded)
     if successful_results and not args.dry_run:

@@ -120,7 +120,7 @@ def test_esma_metadata_is_saved_after_successful_import(monkeypatch):
 
     assert exit_code == module.EXIT_SUCCESS
     assert metadata_calls["esma_date"] == date(2026, 2, 8)
-    assert metadata_calls["registers"] == [module.RegisterType.CASP]
+    assert metadata_calls["registers"] == list(module.RegisterType)
 
 
 def test_esma_metadata_is_saved_for_already_up_to_date_registers(monkeypatch):
@@ -157,4 +157,4 @@ def test_esma_metadata_is_saved_for_already_up_to_date_registers(monkeypatch):
 
     assert exit_code == module.EXIT_SUCCESS
     assert metadata_calls["esma_date"] == date(2026, 2, 8)
-    assert metadata_calls["registers"] == [module.RegisterType.CASP]
+    assert metadata_calls["registers"] == list(module.RegisterType)
