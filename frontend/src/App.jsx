@@ -10,7 +10,7 @@ import { ContactPill } from './components/ContactPill';
 import { formatDate, copyToClipboard } from './utils/modalUtils';
 import { getServiceCodeOrder, getServiceMediumName } from './utils/serviceDescriptions';
 import { useDebounce } from './utils/debounce';
-import { COUNTRY_NAMES } from './utils/countryNames';
+import { COUNTRY_NAMES, getPrimaryCountryCode } from './utils/countryNames';
 
 const PAGE_SIZE = 100;
 
@@ -204,6 +204,9 @@ function App({ registerType = 'casp' }) {
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const startItem = count === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const endItem = count === 0 ? 0 : Math.min((currentPage - 1) * PAGE_SIZE + entities.length, count);
+  const selectedCountryCode = selectedEntity
+    ? getPrimaryCountryCode(selectedEntity.home_member_state, selectedEntity.lei_cou_code)
+    : null;
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -422,11 +425,11 @@ function App({ registerType = 'casp' }) {
                     </h2>
                     {/* Overview line */}
                     <div className="text-[clamp(0.7rem,1.5vw,0.875rem)] text-textMuted flex items-center gap-2 whitespace-nowrap overflow-hidden">
-                      {selectedEntity.home_member_state && (
-                        <FlagIcon countryCode={selectedEntity.home_member_state} size="sm" />
+                      {selectedCountryCode && (
+                        <FlagIcon countryCode={selectedCountryCode} size="sm" />
                       )}
-                      {selectedEntity.home_member_state && (
-                        <span>{COUNTRY_NAMES[selectedEntity.home_member_state] || selectedEntity.home_member_state}</span>
+                      {selectedCountryCode && (
+                        <span>{COUNTRY_NAMES[selectedCountryCode] || selectedCountryCode}</span>
                       )}
                       {selectedEntity.competent_authority && (
                         <>

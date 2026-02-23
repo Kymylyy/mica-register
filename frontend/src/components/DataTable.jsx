@@ -10,6 +10,7 @@ import {
 import { FlagIcon } from './FlagIcon';
 import { getServiceShortName, getServiceCodeOrder } from '../utils/serviceDescriptions';
 import { getRegisterColumns, getDefaultColumnVisibility, getRegisterCounterLabel } from '../config/registerColumns';
+import { getPrimaryCountryCode } from '../utils/countryNames';
 
 const columnHelper = createColumnHelper();
 
@@ -39,7 +40,8 @@ const createCellRenderer = (columnId) => {
 
     case 'home_member_state':
       return (info) => {
-        const code = info.getValue();
+        const row = info.row.original;
+        const code = getPrimaryCountryCode(info.getValue(), row.lei_cou_code);
         return (
           <div className="flex items-center gap-1.5">
             {code && <FlagIcon countryCode={code} size="sm" />}
@@ -388,7 +390,7 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
         {table.getRowModel().rows.map((row, rowIndex) => {
           const entity = row.original;
           const commercialName = entity.commercial_name?.trim() || entity.lei_name || '-';
-          const homeState = entity.home_member_state;
+          const homeState = getPrimaryCountryCode(entity.home_member_state, entity.lei_cou_code);
           const authDate = entity.authorisation_notification_date;
           const services = entity.services || [];
           const sortedServices = [...services].sort((a, b) => 
