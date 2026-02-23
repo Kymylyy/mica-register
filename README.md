@@ -5,6 +5,9 @@ Public web app for browsing ESMA MiCA registers in one searchable interface.
 [![CI](https://github.com/Kymylyy/mica-register/actions/workflows/ci.yml/badge.svg)](https://github.com/Kymylyy/mica-register/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+Live app: [mica-register.vercel.app](https://mica-register.vercel.app)  
+Backend API: [mica-register-production.up.railway.app/docs](https://mica-register-production.up.railway.app/docs)
+
 ## What It Does
 
 - Aggregates all 5 ESMA MiCA registers in one UI:
@@ -29,7 +32,7 @@ Public web app for browsing ESMA MiCA registers in one searchable interface.
 ### 1. Clone
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Kymylyy/mica-register.git
 cd mica-register
 ```
 
