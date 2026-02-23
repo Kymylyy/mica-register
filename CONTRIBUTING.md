@@ -13,6 +13,7 @@ Thanks for contributing to MiCA Register.
 Run these before opening a pull request:
 
 - `cd frontend && npm run lint`
+- `cd frontend && npm run typecheck`
 - `cd frontend && npm run test -- --run`
 - `cd frontend && npm run build`
 - `python3 -m pytest`

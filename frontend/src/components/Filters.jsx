@@ -153,18 +153,19 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
 
   // Sync date inputs with filters (convert YYYY-MM-DD to DD-MM-YYYY for display)
   useEffect(() => {
-    if (filters.auth_date_from === null || filters.auth_date_from === undefined) {
-      setAuthDateFromInput('');
-    } else {
-      const displayValue = formatDateForDisplay(filters.auth_date_from);
-      setAuthDateFromInput(displayValue);
-    }
-    if (filters.auth_date_to === null || filters.auth_date_to === undefined) {
-      setAuthDateToInput('');
-    } else {
-      const displayValue = formatDateForDisplay(filters.auth_date_to);
-      setAuthDateToInput(displayValue);
-    }
+    const nextFrom =
+      filters.auth_date_from === null || filters.auth_date_from === undefined
+        ? ''
+        : formatDateForDisplay(filters.auth_date_from);
+    const nextTo =
+      filters.auth_date_to === null || filters.auth_date_to === undefined
+        ? ''
+        : formatDateForDisplay(filters.auth_date_to);
+
+    queueMicrotask(() => {
+      setAuthDateFromInput(nextFrom);
+      setAuthDateToInput(nextTo);
+    });
   }, [filters.auth_date_from, filters.auth_date_to]);
 
   // Fetch counts whenever filters change - OPTIMIZED with debounce and AbortController

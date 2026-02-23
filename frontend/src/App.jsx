@@ -133,7 +133,7 @@ function App({ registerType = 'casp' }) {
       fetchEntities();
       return;
     }
-  }, []);
+  }, [fetchEntities]);
 
   // Effect for register type change - reset filters
   useEffect(() => {

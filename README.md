@@ -110,6 +110,7 @@ See `.env.example` and `frontend/.env.example` for local templates.
 Frontend:
 
 - `cd frontend && npm run lint`
+- `cd frontend && npm run typecheck`
 - `cd frontend && npm run test -- --run`
 - `cd frontend && npm run build`
 

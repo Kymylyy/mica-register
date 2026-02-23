@@ -238,7 +238,7 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
     return Object.keys(defaultColumnVisibility).every(
       key => columnVisibility[key] === defaultColumnVisibility[key]
     );
-  }, [columnVisibility]);
+  }, [columnVisibility, defaultColumnVisibility]);
   
   // Reset to default columns
   const resetToDefault = () => {
@@ -290,6 +290,8 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
     );
   }, [registerType]);
 
+  // TanStack Table intentionally exposes function-heavy APIs that trigger this lint rule.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns,
