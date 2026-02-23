@@ -5,7 +5,7 @@ Public web app for browsing ESMA MiCA registers in one searchable interface.
 [![CI](https://github.com/Kymylyy/mica-register/actions/workflows/ci.yml/badge.svg)](https://github.com/Kymylyy/mica-register/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Live app: [mica-register.vercel.app](https://mica-register.vercel.app)  
+Live app: [www.micaregister.com](https://www.micaregister.com)  
 Backend API: [mica-register-production.up.railway.app/docs](https://mica-register-production.up.railway.app/docs)
 
 ## What It Does
