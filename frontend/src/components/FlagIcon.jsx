@@ -21,23 +21,6 @@ function getFlagCode(countryCode) {
 }
 
 /**
- * Converts country code to emoji flag (kept for backward compatibility)
- * @param {string} countryCode - Two-letter country code (e.g., 'AT', 'DE', 'EL')
- * @returns {string} Emoji flag
- * @deprecated Use FlagIcon component instead for better compatibility
- */
-export function getCountryFlag(countryCode) {
-  const flagCode = getFlagCode(countryCode);
-  if (!flagCode) return '';
-  
-  const codePoints = flagCode.toUpperCase()
-    .split('')
-    .map(char => 127397 + char.charCodeAt(0));
-  
-  return String.fromCodePoint(...codePoints);
-}
-
-/**
  * FlagIcon component - uses flag-icons library (SVG flags that work everywhere)
  * @param {string} countryCode - Two-letter country code (e.g., 'AT', 'DE', 'EL')
  * @param {string} className - Additional CSS classes
@@ -69,5 +52,4 @@ export function FlagIcon({ countryCode, className = '', size = 'sm' }) {
     />
   );
 }
-
 

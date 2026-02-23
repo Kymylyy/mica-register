@@ -8,13 +8,14 @@ import {
   createColumnHelper,
 } from '@tanstack/react-table';
 import { FlagIcon } from './FlagIcon';
-import { getServiceDescription, getServiceShortName, getServiceCodeOrder } from '../utils/serviceDescriptions';
+import { getServiceShortName, getServiceCodeOrder } from '../utils/serviceDescriptions';
 import { getRegisterColumns, getDefaultColumnVisibility, getRegisterCounterLabel } from '../config/registerColumns';
+import { getPrimaryCountryCode } from '../utils/countryNames';
 
 const columnHelper = createColumnHelper();
 
 // Presentational component for service tags
-const ServiceTag = ({ serviceCode, fullDescription, shortName }) => (
+const ServiceTag = ({ shortName }) => (
   <span
     className="px-2.5 py-[3px] text-xs font-medium bg-sky-50 text-sky-700 rounded-full border border-sky-200"
   >
@@ -25,7 +26,7 @@ const ServiceTag = ({ serviceCode, fullDescription, shortName }) => (
 /**
  * Create cell renderer for a specific column
  */
-const createCellRenderer = (columnId, registerType) => {
+const createCellRenderer = (columnId) => {
   switch (columnId) {
     case 'commercial_name':
       return (info) => {
@@ -39,7 +40,8 @@ const createCellRenderer = (columnId, registerType) => {
 
     case 'home_member_state':
       return (info) => {
-        const code = info.getValue();
+        const row = info.row.original;
+        const code = getPrimaryCountryCode(info.getValue(), row.lei_cou_code);
         return (
           <div className="flex items-center gap-1.5">
             {code && <FlagIcon countryCode={code} size="sm" />}
@@ -70,8 +72,6 @@ const createCellRenderer = (columnId, registerType) => {
             {sortedServices.map((service, idx) => (
               <ServiceTag
                 key={idx}
-                serviceCode={service.code}
-                fullDescription={getServiceDescription(service.code)}
                 shortName={getServiceShortName(service.code)}
               />
             ))}
@@ -240,7 +240,7 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
     return Object.keys(defaultColumnVisibility).every(
       key => columnVisibility[key] === defaultColumnVisibility[key]
     );
-  }, [columnVisibility]);
+  }, [columnVisibility, defaultColumnVisibility]);
   
   // Reset to default columns
   const resetToDefault = () => {
@@ -284,7 +284,7 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
       columnHelper.accessor(colDef.id, {
         header: colDef.label,
         size: colDef.size || 150,
-        cell: createCellRenderer(colDef.id, registerType),
+        cell: createCellRenderer(colDef.id),
         meta: {
           description: colDef.description
         }
@@ -292,6 +292,8 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
     );
   }, [registerType]);
 
+  // TanStack Table intentionally exposes function-heavy APIs that trigger this lint rule.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns,
@@ -388,7 +390,7 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
         {table.getRowModel().rows.map((row, rowIndex) => {
           const entity = row.original;
           const commercialName = entity.commercial_name?.trim() || entity.lei_name || '-';
-          const homeState = entity.home_member_state;
+          const homeState = getPrimaryCountryCode(entity.home_member_state, entity.lei_cou_code);
           const authDate = entity.authorisation_notification_date;
           const services = entity.services || [];
           const sortedServices = [...services].sort((a, b) => 
@@ -436,8 +438,6 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
                       return (
                         <ServiceTag
                           key={idx}
-                          serviceCode={service.code}
-                          fullDescription={getServiceDescription(service.code)}
                           shortName={shortName}
                         />
                       );
@@ -528,5 +528,3 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
     </div>
   );
 }
-
-

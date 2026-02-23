@@ -36,6 +36,27 @@ export const COUNTRY_NAMES = {
   'EL': 'Greece', // Alternative code for Greece
 };
 
+function normalizeCountryCode(countryCode) {
+  if (typeof countryCode !== 'string') return '';
+  return countryCode.trim().toUpperCase();
+}
+
+/**
+ * Select primary country code for display.
+ * Prefer home member state, fallback to LEI country code.
+ *
+ * @param {string | null | undefined} homeMemberState
+ * @param {string | null | undefined} leiCountryCode
+ * @returns {string | null}
+ */
+export function getPrimaryCountryCode(homeMemberState, leiCountryCode) {
+  const normalizedHome = normalizeCountryCode(homeMemberState);
+  if (normalizedHome) return normalizedHome;
+
+  const normalizedLei = normalizeCountryCode(leiCountryCode);
+  return normalizedLei || null;
+}
+
 /**
  * Get country name from country code
  * @param {string} countryCode - Two-letter country code

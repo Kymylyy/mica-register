@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
 import { FlagIcon } from './FlagIcon';
-import { getServiceDescriptionCapitalized, getServiceCodeOrder, getServiceShortName, getServiceDescription } from '../utils/serviceDescriptions';
+import { getServiceCodeOrder, getServiceShortName, getServiceDescription } from '../utils/serviceDescriptions';
 import { useDebounce } from '../utils/debounce';
 import { COUNTRY_NAMES } from '../utils/countryNames';
 
@@ -153,18 +153,19 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
 
   // Sync date inputs with filters (convert YYYY-MM-DD to DD-MM-YYYY for display)
   useEffect(() => {
-    if (filters.auth_date_from === null || filters.auth_date_from === undefined) {
-      setAuthDateFromInput('');
-    } else {
-      const displayValue = formatDateForDisplay(filters.auth_date_from);
-      setAuthDateFromInput(displayValue);
-    }
-    if (filters.auth_date_to === null || filters.auth_date_to === undefined) {
-      setAuthDateToInput('');
-    } else {
-      const displayValue = formatDateForDisplay(filters.auth_date_to);
-      setAuthDateToInput(displayValue);
-    }
+    const nextFrom =
+      filters.auth_date_from === null || filters.auth_date_from === undefined
+        ? ''
+        : formatDateForDisplay(filters.auth_date_from);
+    const nextTo =
+      filters.auth_date_to === null || filters.auth_date_to === undefined
+        ? ''
+        : formatDateForDisplay(filters.auth_date_to);
+
+    queueMicrotask(() => {
+      setAuthDateFromInput(nextFrom);
+      setAuthDateToInput(nextTo);
+    });
   }, [filters.auth_date_from, filters.auth_date_to]);
 
   // Fetch counts whenever filters change - OPTIMIZED with debounce and AbortController
@@ -543,7 +544,7 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
                 </svg>
                 <span>Authorisation / notification date</span>
                 <svg 
-                  className={`w-4 h-4 transition-transform ${authDateDetailsRef.current?.open ? 'rotate-180' : ''}`}
+                  className="w-4 h-4 transition-transform"
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
@@ -808,7 +809,7 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
                   </span>
                 )}
                 <svg 
-                  className={`w-4 h-4 transition-transform ${homeMemberStateDetailsRef.current?.open ? 'rotate-180' : ''}`}
+                  className="w-4 h-4 transition-transform"
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
@@ -999,7 +1000,7 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
                   </span>
                 )}
                 <svg 
-                  className={`w-4 h-4 transition-transform ${cryptoServicesDetailsRef.current?.open ? 'rotate-180' : ''}`}
+                  className="w-4 h-4 transition-transform"
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"

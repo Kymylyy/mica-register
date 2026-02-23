@@ -4,6 +4,7 @@
 
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import { beforeAll, afterEach, afterAll } from 'vitest';
 import { createMockApiResponse, getMockEntities } from './fixtures';
 
 const API_BASE = 'http://localhost:8000';
