@@ -265,7 +265,21 @@ def import_to_db(
     try:
         print(f"  Importing to database...")
 
-        cmd = [sys.executable, "backend/import_all_registers.py"]
+        project_root = Path(__file__).resolve().parent.parent
+        import_script = next(
+            (
+                candidate for candidate in (
+                    project_root / "backend" / "import_all_registers.py",
+                    project_root / "import_all_registers.py",
+                ) if candidate.exists()
+            ),
+            None
+        )
+        if import_script is None:
+            print("  ❌ Database import failed (script not found)")
+            return False, {}
+
+        cmd = [sys.executable, str(import_script)]
         if drop_db:
             cmd.append("--drop-db")
         if prefer_llm:
@@ -765,6 +779,7 @@ def main():
     entity_counts = {}
     successful_results = [r for r in results if r.success]
     import_success = True
+    import_failed = False
     if successful_results and not args.dry_run:
         print(f"\n{'='*60}")
         print("Step 5: Importing to database")
@@ -779,6 +794,7 @@ def main():
 
         if not import_success:
             print("⚠️  Warning: Database import failed")
+            import_failed = True
 
         # Update entity counts in results
         for result in results:
@@ -826,7 +842,7 @@ def main():
     # Return appropriate exit code
     if esma_date is None and not args.force:
         return EXIT_ESMA_DATE_UNAVAILABLE
-    if any(not r.success and not r.skipped for r in results):
+    if import_failed or any(not r.success and not r.skipped for r in results):
         return EXIT_FAILURE
     return EXIT_SUCCESS
 
