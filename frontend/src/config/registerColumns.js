@@ -327,7 +327,7 @@ export function getRegisterColumns(registerType) {
     case 'casp':
       return [...baseColumns, ...CASP_SPECIFIC_COLUMNS];
 
-    case 'other':
+    case 'other': {
       // OTHER doesn't have commercial_name, website, comments, or address in CSV
       // Custom column order: WHITE PAPER / LEI NAME / COUNTRY / LAST UPDATE
       const otherCommon = baseColumns
@@ -367,11 +367,12 @@ export function getRegisterColumns(registerType) {
       });
 
       return orderedColumns;
+    }
 
     case 'art':
       return [...baseColumns, ...ART_SPECIFIC_COLUMNS];
 
-    case 'emt':
+    case 'emt': {
       // Change "Commercial Name" to "Issuer" for EMT
       const emtCommon = baseColumns.map(col => {
         if (col.id === 'commercial_name') {
@@ -380,11 +381,13 @@ export function getRegisterColumns(registerType) {
         return col;
       });
       return [...emtCommon, ...EMT_SPECIFIC_COLUMNS];
+    }
 
-    case 'ncasp':
+    case 'ncasp': {
       // NCASP doesn't have address or website (uses 'websites' instead) in CSV
       const ncaspCommon = baseColumns.filter(col => col.id !== 'address' && col.id !== 'website');
       return [...ncaspCommon, ...NCASP_SPECIFIC_COLUMNS];
+    }
 
     default:
       console.warn(`Unknown register type: ${registerType}, defaulting to CASP`);

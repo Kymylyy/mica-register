@@ -2,6 +2,9 @@
 
 Public web app for browsing ESMA MiCA registers in one searchable interface.
 
+[![CI](https://github.com/Kymylyy/mica-register/actions/workflows/ci.yml/badge.svg)](https://github.com/Kymylyy/mica-register/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 ## What It Does
 
 - Aggregates all 5 ESMA MiCA registers in one UI:
@@ -102,6 +105,20 @@ See `.env.example` and `frontend/.env.example` for local templates.
 - Build command: `npm run build`
 - Output directory: `dist`
 
+## Quality Checks
+
+Frontend:
+
+- `cd frontend && npm run lint`
+- `cd frontend && npm run test -- --run`
+- `cd frontend && npm run build`
+
+Backend:
+
+- `python3 -m pytest`
+
+CI runs the same checks on every pull request and push.
+
 ## Data Source
 
 Primary source: ESMA MiCA register publications.
@@ -110,9 +127,11 @@ Before redistributing data snapshots from `data/`, confirm legal/licensing requi
 
 ## Contributing
 
-1. Create a branch from `main`
-2. Run checks locally (`frontend` lint/test + backend tests)
-3. Open a PR
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for vulnerability reporting and secret handling expectations.
 
 ## License
 
