@@ -43,6 +43,30 @@ ENTITY_EAGER_LOAD_OPTIONS = [
 ]
 
 
+def get_effective_home_member_state_expr():
+    """Use home member state with fallback to LEI country code."""
+    return func.upper(
+        func.coalesce(
+            func.nullif(func.trim(Entity.home_member_state), ""),
+            func.nullif(func.trim(Entity.lei_cou_code), "")
+        )
+    )
+
+
+def normalize_country_codes(country_codes: Optional[List[str]]) -> List[str]:
+    """Normalize country codes from query params to uppercase 2-letter-like values."""
+    return [code.strip().upper() for code in (country_codes or []) if code and code.strip()]
+
+
+def apply_home_member_state_filter(query, home_member_states: Optional[List[str]]):
+    """Filter by effective home member state (home state with LEI country fallback)."""
+    normalized_states = normalize_country_codes(home_member_states)
+    if not normalized_states:
+        return query
+
+    return query.filter(get_effective_home_member_state_expr().in_(normalized_states))
+
+
 def require_admin_token(authorization: Optional[str] = Header(None)) -> None:
     """Require valid Bearer token for admin endpoints."""
     if not authorization:
@@ -107,7 +131,7 @@ def apply_search_filter(query, search: str, register_type: RegisterType = Regist
 
     # Add country code matches to search conditions
     if matching_country_codes:
-        search_conditions.append(Entity.home_member_state.in_(matching_country_codes))
+        search_conditions.append(get_effective_home_member_state_expr().in_(matching_country_codes))
 
     # Check if search term matches any service description (CASP only)
     # Other registers don't have services, so skip this check
@@ -218,8 +242,7 @@ def get_entities(
     query = query.filter(Entity.register_type == register_type)
 
     # Apply common filters
-    if home_member_states and len(home_member_states) > 0:
-        query = query.filter(Entity.home_member_state.in_(home_member_states))
+    query = apply_home_member_state_filter(query, home_member_states)
 
     # Service codes filter - only applicable for CASP
     if service_codes and len(service_codes) > 0:
@@ -278,8 +301,7 @@ def get_entities_count(
     query = query.filter(Entity.register_type == register_type)
 
     # Apply same filters as get_entities
-    if home_member_states and len(home_member_states) > 0:
-        query = query.filter(Entity.home_member_state.in_(home_member_states))
+    query = apply_home_member_state_filter(query, home_member_states)
 
     # Service codes filter - only for CASP
     if service_codes and len(service_codes) > 0:
@@ -376,8 +398,10 @@ def get_filter_options(
 
     # Get home member states with their authorities grouped by country
     # Filter by register type
+    effective_home_member_state = get_effective_home_member_state_expr().label("effective_home_member_state")
+
     authorities_data = db.query(
-        Entity.home_member_state,
+        effective_home_member_state,
         Entity.competent_authority
     ).filter(Entity.register_type == register_type).distinct().all()
     
@@ -467,8 +491,10 @@ def get_filter_counts(
 
     # === COUNTRY COUNTS - Single GROUP BY query ===
     # Build base query for countries with all filters EXCEPT home_member_states
+    effective_home_member_state = get_effective_home_member_state_expr()
+
     country_query = db.query(
-        Entity.home_member_state,
+        effective_home_member_state.label("country_code"),
         func.count(distinct(Entity.id)).label('count')
     ).filter(Entity.register_type == register_type)  # Filter by register type
 
@@ -494,7 +520,7 @@ def get_filter_counts(
         country_query = country_query.filter(Entity.id.in_(service_count_subquery))
 
     # Group by country and get counts
-    country_query = country_query.group_by(Entity.home_member_state)
+    country_query = country_query.group_by(effective_home_member_state)
     country_results = country_query.all()
 
     # Convert to dict, filtering out null countries
@@ -518,8 +544,7 @@ def get_filter_counts(
         )  # Join through casp_entity
 
         # Apply filters
-        if home_member_states and len(home_member_states) > 0:
-            service_query = service_query.filter(Entity.home_member_state.in_(home_member_states))
+        service_query = apply_home_member_state_filter(service_query, home_member_states)
 
         # Apply service_codes filter with AND logic - show counts only for entities that have ALL selected services
         if service_codes and len(service_codes) > 0:
