@@ -13,6 +13,22 @@ const parsedBatchSize = Number.parseInt(process.env.PRERENDER_DETAIL_BATCH_SIZE 
 const detailBatchSize = Number.isInteger(parsedBatchSize) && parsedBatchSize > 0
   ? parsedBatchSize
   : 500;
+const parsedMinDetailPages = Number.parseInt(process.env.PRERENDER_MIN_DETAIL_PAGES || '1', 10);
+const minDetailPages = Number.isInteger(parsedMinDetailPages) && parsedMinDetailPages >= 0
+  ? parsedMinDetailPages
+  : 1;
+const detailFailureModeRaw = process.env.PRERENDER_DETAIL_FAILURE_MODE;
+const detailFailureModeDefault = process.env.CI === 'true' || process.env.VERCEL === '1'
+  ? 'error'
+  : 'warn';
+const detailFailureMode = (detailFailureModeRaw || detailFailureModeDefault).toLowerCase();
+const allowedDetailFailureModes = new Set(['error', 'warn', 'off']);
+
+if (!allowedDetailFailureModes.has(detailFailureMode)) {
+  throw new Error(
+    `Invalid PRERENDER_DETAIL_FAILURE_MODE: "${detailFailureModeRaw}". Allowed values: error, warn, off.`,
+  );
+}
 
 const staticRoutes = [
   {
@@ -240,32 +256,123 @@ async function fetchRegisterEntities(registerType) {
 async function fetchDetailRoutes() {
   if (process.env.PRERENDER_ENTITY_DETAILS === '0') {
     console.log('Skipping entity detail prerender because PRERENDER_ENTITY_DETAILS=0');
-    return [];
+    return {
+      detailRoutes: [],
+      registerSummaries: [],
+      failures: [],
+      skipped: true,
+    };
   }
 
   const detailRoutes = [];
+  const registerSummaries = [];
+  const failures = [];
 
   for (const registerRoute of registerRoutes) {
     try {
       const entities = await fetchRegisterEntities(registerRoute.registerType);
+      let detailCountForRegister = 0;
+
       for (const entity of entities) {
         const detailRoute = createDetailRoute(entity, registerRoute);
         if (detailRoute) {
           detailRoutes.push(detailRoute);
+          detailCountForRegister += 1;
         }
       }
 
+      registerSummaries.push({
+        registerType: registerRoute.registerType,
+        entityCount: entities.length,
+        detailCount: detailCountForRegister,
+        error: null,
+      });
       console.log(
-        `Prepared ${entities.length} detail pages for ${registerRoute.registerType.toUpperCase()}`,
+        `Prepared ${detailCountForRegister} detail pages for ${registerRoute.registerType.toUpperCase()} (entities fetched: ${entities.length})`,
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push({
+        registerType: registerRoute.registerType,
+        message,
+      });
+      registerSummaries.push({
+        registerType: registerRoute.registerType,
+        entityCount: 0,
+        detailCount: 0,
+        error: message,
+      });
       console.warn(
-        `Skipping detail prerender for ${registerRoute.registerType}: ${error.message}`,
+        `Skipping detail prerender for ${registerRoute.registerType}: ${message}`,
       );
     }
   }
 
-  return detailRoutes;
+  return {
+    detailRoutes,
+    registerSummaries,
+    failures,
+    skipped: false,
+  };
+}
+
+function reportDetailPrerenderSummary(detailResult) {
+  if (detailResult.skipped) {
+    console.log('Detail prerender summary: skipped by PRERENDER_ENTITY_DETAILS=0');
+    return;
+  }
+
+  if (detailResult.registerSummaries.length === 0) {
+    console.log('Detail prerender summary: no register summaries available');
+    return;
+  }
+
+  const summary = detailResult.registerSummaries
+    .map((item) => {
+      const base = `${item.registerType}: entities=${item.entityCount}, details=${item.detailCount}`;
+      if (item.error) {
+        return `${base}, error=${item.error}`;
+      }
+      return base;
+    })
+    .join(' | ');
+
+  console.log(`Detail prerender summary: ${summary}`);
+}
+
+function validateDetailPrerender(detailResult) {
+  if (detailResult.skipped || detailFailureMode === 'off') {
+    if (detailFailureMode === 'off' && !detailResult.skipped) {
+      console.warn('Detail prerender validation is disabled (PRERENDER_DETAIL_FAILURE_MODE=off)');
+    }
+    return;
+  }
+
+  const detailCount = detailResult.detailRoutes.length;
+  const issueLines = [];
+
+  if (detailResult.failures.length > 0) {
+    for (const failure of detailResult.failures) {
+      issueLines.push(`${failure.registerType}: ${failure.message}`);
+    }
+  }
+
+  if (detailCount < minDetailPages) {
+    issueLines.push(
+      `detail pages generated (${detailCount}) is below minimum PRERENDER_MIN_DETAIL_PAGES=${minDetailPages}`,
+    );
+  }
+
+  if (issueLines.length === 0) {
+    return;
+  }
+
+  const message = `Detail prerender validation issue(s): ${issueLines.join(' | ')}`;
+  if (detailFailureMode === 'error') {
+    throw new Error(message);
+  }
+
+  console.warn(message);
 }
 
 function prerenderMarkup(route) {
@@ -372,8 +479,10 @@ function renderRouteHtml(templateHtml, route) {
 
 async function writeRouteFiles() {
   const templateHtml = await readFile(indexPath, 'utf8');
-  const detailRoutes = await fetchDetailRoutes();
-  const routes = [...staticRoutes, ...detailRoutes];
+  const detailResult = await fetchDetailRoutes();
+  reportDetailPrerenderSummary(detailResult);
+  validateDetailPrerender(detailResult);
+  const routes = [...staticRoutes, ...detailResult.detailRoutes];
 
   for (const route of routes) {
     const html = renderRouteHtml(templateHtml, route);
@@ -389,15 +498,16 @@ async function writeRouteFiles() {
 
   return {
     staticCount: staticRoutes.length,
-    detailCount: detailRoutes.length,
+    detailCount: detailResult.detailRoutes.length,
+    detailFetchFailureCount: detailResult.failures.length,
     totalCount: routes.length,
   };
 }
 
 try {
-  const { staticCount, detailCount, totalCount } = await writeRouteFiles();
+  const { staticCount, detailCount, detailFetchFailureCount, totalCount } = await writeRouteFiles();
   console.log(
-    `Prerendered ${totalCount} route pages in ${distDir} (${staticCount} static + ${detailCount} detail)`,
+    `Prerendered ${totalCount} route pages in ${distDir} (${staticCount} static + ${detailCount} detail, fetch failures: ${detailFetchFailureCount})`,
   );
 } catch (error) {
   console.error('Failed to prerender route pages:', error);
