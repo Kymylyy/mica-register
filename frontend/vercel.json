@@ -4,6 +4,19 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "vite",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "micaregister.com"
+        }
+      ],
+      "destination": "https://www.micaregister.com/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
@@ -11,4 +24,3 @@
     }
   ]
 }
-

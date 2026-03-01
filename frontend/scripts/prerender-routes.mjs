@@ -146,6 +146,15 @@ function canonicalFor(routePath) {
   return routePath === '/' ? `${baseUrl}/` : `${baseUrl}${routePath}`;
 }
 
+function escapeXml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -477,6 +486,19 @@ function renderRouteHtml(templateHtml, route) {
   return html;
 }
 
+function buildSitemapXml(routes) {
+  const uniqueUrls = [...new Set(routes.map((route) => canonicalFor(route.path)))];
+  const urlRows = uniqueUrls
+    .map((url) => `  <url>\n    <loc>${escapeXml(url)}</loc>\n  </url>`)
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlRows}\n</urlset>\n`;
+}
+
+function buildRobotsTxt() {
+  return `User-agent: *\nAllow: /\n\nSitemap: ${canonicalFor('/sitemap.xml')}\n`;
+}
+
 async function writeRouteFiles() {
   const templateHtml = await readFile(indexPath, 'utf8');
   const detailResult = await fetchDetailRoutes();
@@ -496,19 +518,30 @@ async function writeRouteFiles() {
     await writeFile(path.join(outDir, 'index.html'), html, 'utf8');
   }
 
+  await writeFile(path.join(distDir, 'sitemap.xml'), buildSitemapXml(routes), 'utf8');
+  await writeFile(path.join(distDir, 'robots.txt'), buildRobotsTxt(), 'utf8');
+
   return {
     staticCount: staticRoutes.length,
     detailCount: detailResult.detailRoutes.length,
     detailFetchFailureCount: detailResult.failures.length,
     totalCount: routes.length,
+    sitemapUrlCount: new Set(routes.map((route) => canonicalFor(route.path))).size,
   };
 }
 
 try {
-  const { staticCount, detailCount, detailFetchFailureCount, totalCount } = await writeRouteFiles();
+  const {
+    staticCount,
+    detailCount,
+    detailFetchFailureCount,
+    totalCount,
+    sitemapUrlCount,
+  } = await writeRouteFiles();
   console.log(
     `Prerendered ${totalCount} route pages in ${distDir} (${staticCount} static + ${detailCount} detail, fetch failures: ${detailFetchFailureCount})`,
   );
+  console.log(`Generated sitemap.xml with ${sitemapUrlCount} URLs and refreshed robots.txt`);
 } catch (error) {
   console.error('Failed to prerender route pages:', error);
   process.exit(1);
