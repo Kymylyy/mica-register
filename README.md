@@ -110,6 +110,7 @@ See `.env.example` and `frontend/.env.example` for local templates.
 - Build command: `npm run build`
 - Output directory: `dist`
 - Build output includes static prerendered pages for `/`, `/casp`, `/other`, `/art`, `/emt`, and `/ncasp`, plus entity detail pages (for example `/casp/{id}`) based on the latest API snapshot available during build.
+- Detail prerender validation: by default it fails on CI/Vercel (`PRERENDER_DETAIL_FAILURE_MODE=error`) and warns locally (`warn`) when detail pages cannot be generated or are below `PRERENDER_MIN_DETAIL_PAGES` (default `1`).
 
 ## Quality Checks
 
