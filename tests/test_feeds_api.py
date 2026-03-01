@@ -79,3 +79,32 @@ def test_feed_rate_limit_returns_429_when_threshold_exceeded(client, db_with_cas
 
     limited_response = client.get("/api/feeds/casp.json")
     assert limited_response.status_code == 429
+
+
+def test_api_robots_txt_exposes_sitemap_and_feed_allow_rules(client):
+    response = client.get("/robots.txt")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+
+    body = response.text
+    assert "User-agent: *" in body
+    assert "Allow: /api/feeds/" in body
+    assert "Allow: /docs" in body
+    assert "Allow: /openapi.json" in body
+    assert "Disallow: /api/admin/" in body
+    assert "Sitemap: http://testserver/sitemap.xml" in body
+
+
+def test_api_sitemap_lists_docs_openapi_and_all_feed_urls(client):
+    response = client.get("/sitemap.xml")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/xml")
+
+    body = response.text
+    assert "<loc>http://testserver/docs</loc>" in body
+    assert "<loc>http://testserver/openapi.json</loc>" in body
+    assert "<loc>http://testserver/api/feeds</loc>" in body
+
+    for register in ("casp", "other", "art", "emt", "ncasp"):
+        assert f"<loc>http://testserver/api/feeds/{register}.json</loc>" in body
+        assert f"<loc>http://testserver/api/feeds/{register}.csv</loc>" in body

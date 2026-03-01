@@ -122,6 +122,9 @@ Per-register feeds (public):
 - `GET /api/feeds` (index with feed links + docs + OpenAPI URL on current host)
 - `GET /api/feeds/{register}.json`
 - `GET /api/feeds/{register}.csv`
+- API crawler endpoints on the API host:
+  - `GET /robots.txt`
+  - `GET /sitemap.xml`
 
 Where `{register}` is one of: `casp`, `other`, `art`, `emt`, `ncasp`.
 
