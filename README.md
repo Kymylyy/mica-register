@@ -134,6 +134,11 @@ Operational behavior:
 - Feed responses include `ETag` and `Cache-Control` headers for conditional requests and client/proxy caching.
 - Feed endpoints are rate limited to 30 requests per 60 seconds per client IP.
 
+## LLM Discovery
+
+- `GET /llms.txt` is served by the frontend domain (`https://www.micaregister.com/llms.txt`).
+- It documents canonical host, crawl entry points, entity URL pattern, API docs, data source notes, and technical contact.
+
 ## Quality Checks
 
 Frontend:

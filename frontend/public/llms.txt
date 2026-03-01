@@ -1,0 +1,39 @@
+# MiCA Register
+Canonical: https://www.micaregister.com
+Last-Updated: 2026-03-01
+Language: en
+
+Purpose: Public search interface for ESMA MiCA registers.
+
+Coverage:
+- CASP
+- OTHER
+- ART
+- EMT
+- NCASP
+
+Important URLs:
+- https://www.micaregister.com/sitemap.xml
+- https://www.micaregister.com/robots.txt
+- https://www.micaregister.com/casp
+- https://www.micaregister.com/other
+- https://www.micaregister.com/art
+- https://www.micaregister.com/emt
+- https://www.micaregister.com/ncasp
+
+Entity URL pattern:
+- https://www.micaregister.com/{register}/{id}
+
+API docs:
+- https://api.micaregister.com/docs
+- https://mica-register-production.up.railway.app/docs
+
+Data source:
+- ESMA MiCA register publications.
+
+Notes:
+- Code license: MIT.
+- Data reuse is subject to source terms.
+
+Contact:
+- mailto:kamil.marek.moson@gmail.com
