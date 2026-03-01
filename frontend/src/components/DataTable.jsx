@@ -26,15 +26,48 @@ const ServiceTag = ({ shortName }) => (
 /**
  * Create cell renderer for a specific column
  */
-const createCellRenderer = (columnId) => {
+const createCellRenderer = (columnId, options = {}) => {
+  const { onEntityActivate, getEntityHref } = options;
+
   switch (columnId) {
     case 'commercial_name':
       return (info) => {
         const commercialName = info.getValue();
+        const row = info.row.original;
+        const primaryLabel = commercialName && commercialName.trim() ? commercialName : (row.lei_name || '-');
+        const href = getEntityHref ? getEntityHref(row) : null;
+
+        if (href && onEntityActivate) {
+          return (
+            <a
+              href={href}
+              onClick={(event) => {
+                // Keep modified clicks native (open in new tab/window) but prevent row click.
+                if (
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey ||
+                  event.button !== 0
+                ) {
+                  event.stopPropagation();
+                  return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                onEntityActivate(row);
+              }}
+              className="font-medium text-slate-900 hover:text-sky-700 hover:underline"
+            >
+              {primaryLabel}
+            </a>
+          );
+        }
+
         if (commercialName && commercialName.trim()) {
           return <span className="font-medium">{commercialName}</span>;
         }
-        const row = info.row.original;
         return <span className="font-medium">{row.lei_name || '-'}</span>;
       };
 
@@ -225,7 +258,7 @@ const createCellRenderer = (columnId) => {
   }
 };
 
-export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
+export function DataTable({ data, onRowClick, count, registerType = 'casp', getEntityHref = null }) {
   const [sorting, setSorting] = useState([]);
 
   const defaultColumnVisibility = useMemo(
@@ -284,13 +317,16 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
       columnHelper.accessor(colDef.id, {
         header: colDef.label,
         size: colDef.size || 150,
-        cell: createCellRenderer(colDef.id),
+        cell: createCellRenderer(colDef.id, {
+          onEntityActivate: onRowClick,
+          getEntityHref,
+        }),
         meta: {
           description: colDef.description
         }
       })
     );
-  }, [registerType]);
+  }, [registerType, onRowClick, getEntityHref]);
 
   // TanStack Table intentionally exposes function-heavy APIs that trigger this lint rule.
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -409,7 +445,34 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp' }) {
             >
               {/* Header */}
               <div className="mb-3 pb-3 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-900 leading-relaxed mb-2">{commercialName}</h3>
+                <h3 className="font-semibold text-gray-900 leading-relaxed mb-2">
+                  {getEntityHref ? (
+                    <a
+                      href={getEntityHref(entity)}
+                      onClick={(event) => {
+                        if (
+                          event.metaKey ||
+                          event.ctrlKey ||
+                          event.shiftKey ||
+                          event.altKey ||
+                          event.button !== 0
+                        ) {
+                          event.stopPropagation();
+                          return;
+                        }
+
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onRowClick && onRowClick(entity);
+                      }}
+                      className="hover:text-sky-700 hover:underline"
+                    >
+                      {commercialName}
+                    </a>
+                  ) : (
+                    commercialName
+                  )}
+                </h3>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                   {homeState && (
                     <div className="flex items-center gap-1.5">

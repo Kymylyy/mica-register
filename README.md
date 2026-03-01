@@ -17,6 +17,7 @@ Backend API: [mica-register-production.up.railway.app/docs](https://mica-registe
   - EMT (E-Money Token Issuers)
   - NCASP (Non-compliant entities)
 - Fast filtering by name, country, LEI, services, dates, and register-specific fields
+- Shareable entity deep links (for example `/casp/{entity_id}`) that open details directly
 - Home Member State filtering falls back to LEI country when ESMA country is missing
 - Backend API for search, filtering, and admin imports
 - Data update scripts for download, validation, cleaning, and import
