@@ -108,6 +108,7 @@ See `.env.example` and `frontend/.env.example` for local templates.
 - Set `VITE_API_URL` to your Railway backend URL
 - Build command: `npm run build`
 - Output directory: `dist`
+- Build output includes static prerendered pages for `/`, `/casp`, `/other`, `/art`, `/emt`, and `/ncasp` for crawler-friendly metadata/content.
 
 ## Quality Checks
 
