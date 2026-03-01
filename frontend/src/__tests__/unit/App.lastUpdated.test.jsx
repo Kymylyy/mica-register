@@ -2,6 +2,7 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const { mockGet } = vi.hoisted(() => ({
   mockGet: vi.fn(),
@@ -22,6 +23,17 @@ vi.mock('../../components/RegisterSelector', () => ({
 }));
 
 import App from '../../App';
+
+function renderApp(path = '/casp') {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/casp" element={<App registerType="casp" />} />
+        <Route path="/casp/:entityId" element={<App registerType="casp" />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
 
 describe('App header last updated date', () => {
   beforeEach(() => {
@@ -44,7 +56,7 @@ describe('App header last updated date', () => {
       return Promise.reject(new Error(`Unhandled URL in test: ${url}`));
     });
 
-    render(<App registerType="casp" />);
+    renderApp();
 
     await waitFor(() => {
       expect(screen.getByText(/Last updated: 1 February 2026/i)).toBeTruthy();
@@ -62,7 +74,7 @@ describe('App header last updated date', () => {
       return Promise.reject(new Error(`Unhandled URL in test: ${url}`));
     });
 
-    render(<App registerType="casp" />);
+    renderApp();
 
     await waitFor(() => {
       expect(mockGet).toHaveBeenCalledWith('/api/metadata/last-updated', {
@@ -71,5 +83,37 @@ describe('App header last updated date', () => {
     });
 
     expect(screen.getByText(/Last updated: N\/A/i)).toBeTruthy();
+  });
+
+  it('loads entity details when opening deep-link route', async () => {
+    mockGet.mockImplementation((url) => {
+      if (url.startsWith('/api/entities?')) {
+        return Promise.resolve({ data: { items: [], total: 0 } });
+      }
+      if (url === '/api/entities/123') {
+        return Promise.resolve({
+          data: {
+            id: 123,
+            register_type: 'casp',
+            commercial_name: 'Test CASP Entity',
+            lei_name: 'Test CASP Entity',
+            services: [],
+            passport_countries: [],
+          },
+        });
+      }
+      if (url === '/api/metadata/last-updated') {
+        return Promise.resolve({ data: { register_type: 'casp', last_updated: '2026-02-01' } });
+      }
+      return Promise.reject(new Error(`Unhandled URL in test: ${url}`));
+    });
+
+    renderApp('/casp/123');
+
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalledWith('/api/entities/123');
+    });
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Test CASP Entity' })).toBeTruthy();
   });
 });

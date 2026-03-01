@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import axios from 'axios';
+import { useNavigate, useParams } from 'react-router-dom';
 import api from './utils/api';
 import { DataTable } from './components/DataTable';
 import { Filters } from './components/Filters';
@@ -13,6 +14,82 @@ import { useDebounce } from './utils/debounce';
 import { COUNTRY_NAMES, getPrimaryCountryCode } from './utils/countryNames';
 
 const PAGE_SIZE = 100;
+const SITE_URL = 'https://www.micaregister.com';
+
+const REGISTER_PAGE_META = {
+  casp: {
+    title: 'MiCA CASP Register | EU Crypto-Asset Service Providers',
+    description: 'Search the MiCA CASP register of EU crypto-asset service providers by LEI, country, services, and authorization date.',
+    label: 'CASP',
+  },
+  other: {
+    title: 'MiCA OTHER Register | White Papers for Other Crypto-Assets',
+    description: 'Browse MiCA OTHER white paper notifications, including linked CASP entities, DTI fields, and offer countries.',
+    label: 'OTHER',
+  },
+  art: {
+    title: 'MiCA ART Register | Asset-Referenced Token Issuers',
+    description: 'Explore the MiCA ART register of asset-referenced token issuers with legal entity data and white paper references.',
+    label: 'ART',
+  },
+  emt: {
+    title: 'MiCA EMT Register | E-Money Token Issuers',
+    description: 'Explore the MiCA EMT register of e-money token issuers with exemption flags, institution type, and white paper fields.',
+    label: 'EMT',
+  },
+  ncasp: {
+    title: 'MiCA NCASP Register | Non-Compliant Crypto Entities',
+    description: 'Review MiCA NCASP entries for non-compliant entities, including websites, infringement status, reasons, and decision dates.',
+    label: 'NCASP',
+  },
+};
+
+function ensureMetaTag(selector, attributes) {
+  if (typeof document === 'undefined') return null;
+
+  let tag = document.head.querySelector(selector);
+  if (!tag) {
+    tag = document.createElement('meta');
+    Object.entries(attributes).forEach(([name, value]) => {
+      tag.setAttribute(name, value);
+    });
+    document.head.appendChild(tag);
+  }
+  return tag;
+}
+
+function updateSeoMeta({ title, description, canonicalPath }) {
+  if (typeof document === 'undefined') return;
+
+  const canonicalUrl = `${SITE_URL}${canonicalPath}`;
+  document.title = title;
+
+  const canonicalTag = document.head.querySelector('link[rel="canonical"]');
+  if (canonicalTag) {
+    canonicalTag.setAttribute('href', canonicalUrl);
+  }
+
+  const metaTitleTag = ensureMetaTag('meta[name="title"]', { name: 'title' });
+  if (metaTitleTag) metaTitleTag.setAttribute('content', title);
+
+  const descriptionTag = ensureMetaTag('meta[name="description"]', { name: 'description' });
+  if (descriptionTag) descriptionTag.setAttribute('content', description);
+
+  const ogTitleTag = ensureMetaTag('meta[property="og:title"]', { property: 'og:title' });
+  if (ogTitleTag) ogTitleTag.setAttribute('content', title);
+
+  const ogDescriptionTag = ensureMetaTag('meta[property="og:description"]', { property: 'og:description' });
+  if (ogDescriptionTag) ogDescriptionTag.setAttribute('content', description);
+
+  const ogUrlTag = ensureMetaTag('meta[property="og:url"]', { property: 'og:url' });
+  if (ogUrlTag) ogUrlTag.setAttribute('content', canonicalUrl);
+
+  const twitterTitleTag = ensureMetaTag('meta[name="twitter:title"]', { name: 'twitter:title' });
+  if (twitterTitleTag) twitterTitleTag.setAttribute('content', title);
+
+  const twitterDescriptionTag = ensureMetaTag('meta[name="twitter:description"]', { name: 'twitter:description' });
+  if (twitterDescriptionTag) twitterDescriptionTag.setAttribute('content', description);
+}
 
 function formatHeaderDate(isoDate) {
   if (!isoDate) return 'N/A';
@@ -34,6 +111,8 @@ function formatHeaderDate(isoDate) {
 }
 
 function App({ registerType = 'casp' }) {
+  const navigate = useNavigate();
+  const { entityId: entityIdParam } = useParams();
   const [entities, setEntities] = useState([]);
   const [count, setCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -46,6 +125,8 @@ function App({ registerType = 'casp' }) {
   const modalRef = useRef(null);
   const isInitialMount = useRef(true);
   const abortControllerRef = useRef(null);
+  const registerBasePath = `/${registerType}`;
+  const buildEntityPath = useCallback((entityId) => `${registerBasePath}/${entityId}`, [registerBasePath]);
 
   // Debounce search input (300ms) for better performance
   const debouncedSearch = useDebounce(filters.search, 300);
@@ -193,13 +274,15 @@ function App({ registerType = 'casp' }) {
     setCurrentPage(1);
   };
 
-  const handleRowClick = (entity) => {
+  const handleRowClick = useCallback((entity) => {
     setSelectedEntity(entity);
-  };
+    navigate(buildEntityPath(entity.id));
+  }, [navigate, buildEntityPath]);
 
-  const handleCloseDetails = () => {
+  const handleCloseDetails = useCallback(() => {
     setSelectedEntity(null);
-  };
+    navigate(registerBasePath, { replace: true });
+  }, [navigate, registerBasePath]);
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const startItem = count === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
@@ -213,6 +296,86 @@ function App({ registerType = 'casp' }) {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  // Sync entity modal with URL route (/register/:entityId)
+  useEffect(() => {
+    if (!entityIdParam) {
+      setSelectedEntity(null);
+      return;
+    }
+
+    const parsedEntityId = Number.parseInt(entityIdParam, 10);
+    if (!Number.isInteger(parsedEntityId) || parsedEntityId <= 0) {
+      navigate(registerBasePath, { replace: true });
+      return;
+    }
+
+    let cancelled = false;
+
+    api.get(`/api/entities/${parsedEntityId}`)
+      .then((response) => {
+        if (cancelled) return;
+
+        const entity = response.data;
+
+        // Keep URL and content coherent if entity belongs to another register
+        if (entity?.register_type && entity.register_type !== registerType) {
+          navigate(`/${entity.register_type}/${entity.id}`, { replace: true });
+          return;
+        }
+
+        setSelectedEntity(entity);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+
+        if (
+          error.name === 'CanceledError' ||
+          error.name === 'AbortError' ||
+          error.code === 'ERR_CANCELED'
+        ) {
+          return;
+        }
+
+        if (error.response?.status === 404) {
+          setSelectedEntity(null);
+          navigate(registerBasePath, { replace: true });
+          return;
+        }
+
+        console.error('Error fetching entity:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [entityIdParam, registerType, navigate, registerBasePath]);
+
+  // Update document SEO metadata for register list pages and entity detail routes
+  useEffect(() => {
+    const registerMeta = REGISTER_PAGE_META[registerType] || REGISTER_PAGE_META.casp;
+    const parsedEntityId = entityIdParam ? Number.parseInt(entityIdParam, 10) : null;
+    const hasEntityRoute = Number.isInteger(parsedEntityId) && parsedEntityId > 0;
+
+    if (!hasEntityRoute) {
+      updateSeoMeta({
+        title: registerMeta.title,
+        description: registerMeta.description,
+        canonicalPath: registerBasePath,
+      });
+      return;
+    }
+
+    const entityName = selectedEntity?.commercial_name?.trim() || selectedEntity?.lei_name?.trim() || `Entity ${parsedEntityId}`;
+    const title = `${entityName} | MiCA ${registerMeta.label} Register`;
+    const description = `Entity details for ${entityName} in the MiCA ${registerMeta.label} register, including jurisdiction and register-specific fields.`;
+
+    updateSeoMeta({
+      title,
+      description,
+      canonicalPath: `${registerBasePath}/${parsedEntityId}`,
+    });
+  }, [registerType, registerBasePath, entityIdParam, selectedEntity]);
 
 
   // Keyboard navigation
@@ -233,17 +396,15 @@ function App({ registerType = 'casp' }) {
           newIndex = currentIndex < entities.length - 1 ? currentIndex + 1 : 0;
         }
 
-        setSelectedEntity(entities[newIndex]);
-        // Refresh entity details
-        api.get(`/api/entities/${entities[newIndex].id}`)
-          .then(response => setSelectedEntity(response.data))
-          .catch(error => console.error('Error fetching entity:', error));
+        const nextEntity = entities[newIndex];
+        setSelectedEntity(nextEntity);
+        navigate(buildEntityPath(nextEntity.id), { replace: true });
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedEntity, entities]);
+  }, [selectedEntity, entities, buildEntityPath, navigate, handleCloseDetails]);
 
   // Handle copy to clipboard
   const handleCopy = async (text, label) => {
@@ -351,7 +512,13 @@ function App({ registerType = 'casp' }) {
           )}
           {entities.length > 0 && (
             <div className="transition-opacity duration-300 ease-in-out">
-              <DataTable data={entities} onRowClick={handleRowClick} count={count} registerType={registerType} />
+              <DataTable
+                data={entities}
+                onRowClick={handleRowClick}
+                count={count}
+                registerType={registerType}
+                getEntityHref={(entity) => buildEntityPath(entity.id)}
+              />
               <div className="mt-4 mb-2 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-gray-600">
                   Showing {startItem}-{endItem} of {count}
@@ -361,7 +528,7 @@ function App({ registerType = 'casp' }) {
                     type="button"
                     onClick={() => {
                       setCurrentPage(prev => Math.max(1, prev - 1));
-                      setSelectedEntity(null);
+                      handleCloseDetails();
                     }}
                     disabled={loading || currentPage <= 1}
                     className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -375,7 +542,7 @@ function App({ registerType = 'casp' }) {
                     type="button"
                     onClick={() => {
                       setCurrentPage(prev => Math.min(totalPages, prev + 1));
-                      setSelectedEntity(null);
+                      handleCloseDetails();
                     }}
                     disabled={loading || currentPage >= totalPages}
                     className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
