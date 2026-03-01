@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://micaregister.com/sitemap.xml
+Sitemap: https://www.micaregister.com/sitemap.xml

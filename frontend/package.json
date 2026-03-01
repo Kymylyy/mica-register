@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-routes.mjs",
     "lint": "eslint .",
     "typecheck": "npm run lint -- --max-warnings=0",
     "preview": "vite preview",
