@@ -3,12 +3,23 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const baseUrl = 'https://www.micaregister.com';
-const apiDocsUrl = 'https://mica-register-production.up.railway.app/docs';
+const defaultApiBaseUrl = 'https://mica-register-production.up.railway.app';
+const configuredApiBaseUrl =
+  process.env.PRERENDER_API_URL || process.env.VITE_API_URL || defaultApiBaseUrl;
+const apiBaseUrl = configuredApiBaseUrl.replace(/\/+$/, '');
+const apiDocsUrl = `${apiBaseUrl}/docs`;
 
-const routes = [
+const parsedBatchSize = Number.parseInt(process.env.PRERENDER_DETAIL_BATCH_SIZE || '500', 10);
+const detailBatchSize = Number.isInteger(parsedBatchSize) && parsedBatchSize > 0
+  ? parsedBatchSize
+  : 500;
+
+const staticRoutes = [
   {
     path: '/',
     slug: '',
+    registerType: null,
+    label: null,
     title: 'MiCA Register | ESMA MiCA Registers in One Place',
     description:
       'Browse all ESMA MiCA registers in one searchable interface: CASP, OTHER, ART, EMT, and NCASP.',
@@ -24,6 +35,8 @@ const routes = [
   {
     path: '/casp',
     slug: 'casp',
+    registerType: 'casp',
+    label: 'CASP',
     title: 'MiCA CASP Register | EU Crypto-Asset Service Providers',
     description:
       'Search the MiCA CASP register of EU crypto-asset service providers by LEI, country, services, and authorization date.',
@@ -39,6 +52,8 @@ const routes = [
   {
     path: '/other',
     slug: 'other',
+    registerType: 'other',
+    label: 'OTHER',
     title: 'MiCA OTHER Register | White Papers for Other Crypto-Assets',
     description:
       'Browse MiCA OTHER white paper notifications, including linked CASP entities, DTI fields, and offer countries.',
@@ -54,6 +69,8 @@ const routes = [
   {
     path: '/art',
     slug: 'art',
+    registerType: 'art',
+    label: 'ART',
     title: 'MiCA ART Register | Asset-Referenced Token Issuers',
     description:
       'Explore the MiCA ART register of asset-referenced token issuers with legal entity data and white paper references.',
@@ -69,6 +86,8 @@ const routes = [
   {
     path: '/emt',
     slug: 'emt',
+    registerType: 'emt',
+    label: 'EMT',
     title: 'MiCA EMT Register | E-Money Token Issuers',
     description:
       'Explore the MiCA EMT register of e-money token issuers with exemption flags, institution type, and white paper fields.',
@@ -84,6 +103,8 @@ const routes = [
   {
     path: '/ncasp',
     slug: 'ncasp',
+    registerType: 'ncasp',
+    label: 'NCASP',
     title: 'MiCA NCASP Register | Non-Compliant Crypto Entities',
     description:
       'Review MiCA NCASP entries for non-compliant entities, including websites, infringement status, reasons, and decision dates.',
@@ -98,6 +119,8 @@ const routes = [
   },
 ];
 
+const registerRoutes = staticRoutes.filter((route) => route.registerType);
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distDir = path.resolve(__dirname, '..', 'dist');
@@ -108,7 +131,7 @@ function canonicalFor(routePath) {
 }
 
 function escapeHtml(value) {
-  return value
+  return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
@@ -123,8 +146,130 @@ function setMeta(html, pattern, replacement, label) {
   return html.replace(pattern, replacement);
 }
 
+function normalizeEntityName(entity) {
+  const commercialName = entity?.commercial_name;
+  if (typeof commercialName === 'string' && commercialName.trim()) {
+    return commercialName.trim();
+  }
+
+  const leiName = entity?.lei_name;
+  if (typeof leiName === 'string' && leiName.trim()) {
+    return leiName.trim();
+  }
+
+  return `Entity ${entity?.id ?? 'Unknown'}`;
+}
+
+function createDetailRoute(entity, registerRoute) {
+  const entityId = Number.parseInt(String(entity?.id), 10);
+  if (!Number.isInteger(entityId) || entityId <= 0) {
+    return null;
+  }
+
+  const entityName = normalizeEntityName(entity);
+  return {
+    path: `${registerRoute.path}/${entityId}`,
+    slug: `${registerRoute.slug}/${entityId}`,
+    kind: 'detail',
+    title: `${entityName} | MiCA ${registerRoute.label} Register`,
+    description: `Entity details for ${entityName} in the MiCA ${registerRoute.label} register, including jurisdiction and register-specific fields.`,
+    heading: entityName,
+    summary: `Detailed profile for MiCA ${registerRoute.label} register entry ${entityId}.`,
+    highlights: [
+      `Register: ${registerRoute.heading}.`,
+      `Entity ID: ${entityId}.`,
+      'Open this URL to load the full interactive entity view.',
+    ],
+    registerPath: registerRoute.path,
+    registerHeading: registerRoute.heading,
+  };
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} for ${url}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`Request timed out for ${url}`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function fetchRegisterEntities(registerType) {
+  const entities = [];
+  let skip = 0;
+
+  while (true) {
+    const url = `${apiBaseUrl}/api/entities?register_type=${encodeURIComponent(registerType)}&limit=${detailBatchSize}&skip=${skip}`;
+    const payload = await fetchJsonWithTimeout(url);
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+
+    if (items.length === 0) {
+      break;
+    }
+
+    entities.push(...items);
+    skip += items.length;
+
+    const total = payload?.total;
+    if (typeof total === 'number' && skip >= total) {
+      break;
+    }
+  }
+
+  return entities;
+}
+
+async function fetchDetailRoutes() {
+  if (process.env.PRERENDER_ENTITY_DETAILS === '0') {
+    console.log('Skipping entity detail prerender because PRERENDER_ENTITY_DETAILS=0');
+    return [];
+  }
+
+  const detailRoutes = [];
+
+  for (const registerRoute of registerRoutes) {
+    try {
+      const entities = await fetchRegisterEntities(registerRoute.registerType);
+      for (const entity of entities) {
+        const detailRoute = createDetailRoute(entity, registerRoute);
+        if (detailRoute) {
+          detailRoutes.push(detailRoute);
+        }
+      }
+
+      console.log(
+        `Prepared ${entities.length} detail pages for ${registerRoute.registerType.toUpperCase()}`,
+      );
+    } catch (error) {
+      console.warn(
+        `Skipping detail prerender for ${registerRoute.registerType}: ${error.message}`,
+      );
+    }
+  }
+
+  return detailRoutes;
+}
+
 function prerenderMarkup(route) {
-  const quickLinks = routes
+  const quickLinks = staticRoutes
     .filter(({ path: routePath }) => routePath !== route.path)
     .map(
       ({ path: routePath, slug, heading }) =>
@@ -136,12 +281,17 @@ function prerenderMarkup(route) {
     .map((item) => `<li style="margin:0 0 8px 0;">${escapeHtml(item)}</li>`)
     .join('');
 
+  const registerLink = route.kind === 'detail'
+    ? `<p style="margin:0 0 10px 0;"><strong>Register page:</strong> <a href="${route.registerPath}" style="color:#0f4ecf;text-decoration:none;">${escapeHtml(route.registerHeading)}</a></p>`
+    : '';
+
   return `
       <main style="max-width:960px;margin:0 auto;padding:24px 16px 28px;font-family:Inter,Segoe UI,Arial,sans-serif;line-height:1.6;color:#0f172a;">
         <h1 style="font-size:32px;line-height:1.2;margin:0 0 12px 0;">${escapeHtml(route.heading)}</h1>
         <p style="font-size:18px;color:#334155;margin:0 0 16px 0;">${escapeHtml(route.summary)}</p>
         <p style="margin:0 0 16px 0;color:#334155;">This page is prerendered for search and indexing. The interactive app loads automatically in JavaScript-enabled browsers.</p>
         <ul style="padding-left:20px;margin:0 0 18px 0;">${highlights}</ul>
+        ${registerLink}
         <p style="margin:0 0 8px 0;"><strong>API documentation:</strong> <a href="${apiDocsUrl}" style="color:#0f4ecf;text-decoration:none;">${apiDocsUrl}</a></p>
         <p style="margin:0 0 8px 0;"><strong>Other register pages:</strong></p>
         <ul style="padding-left:20px;margin:0;">${quickLinks}</ul>
@@ -222,6 +372,8 @@ function renderRouteHtml(templateHtml, route) {
 
 async function writeRouteFiles() {
   const templateHtml = await readFile(indexPath, 'utf8');
+  const detailRoutes = await fetchDetailRoutes();
+  const routes = [...staticRoutes, ...detailRoutes];
 
   for (const route of routes) {
     const html = renderRouteHtml(templateHtml, route);
@@ -234,11 +386,19 @@ async function writeRouteFiles() {
     await mkdir(outDir, { recursive: true });
     await writeFile(path.join(outDir, 'index.html'), html, 'utf8');
   }
+
+  return {
+    staticCount: staticRoutes.length,
+    detailCount: detailRoutes.length,
+    totalCount: routes.length,
+  };
 }
 
 try {
-  await writeRouteFiles();
-  console.log(`Prerendered ${routes.length} route pages in ${distDir}`);
+  const { staticCount, detailCount, totalCount } = await writeRouteFiles();
+  console.log(
+    `Prerendered ${totalCount} route pages in ${distDir} (${staticCount} static + ${detailCount} detail)`,
+  );
 } catch (error) {
   console.error('Failed to prerender route pages:', error);
   process.exit(1);
