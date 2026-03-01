@@ -6,7 +6,7 @@ Public web app for browsing ESMA MiCA registers in one searchable interface.
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Live app: [www.micaregister.com](https://www.micaregister.com)  
-Backend API: [mica-register-production.up.railway.app/docs](https://mica-register-production.up.railway.app/docs)
+Backend API docs (recommended custom domain): `https://api.micaregister.com/docs`
 
 ## What It Does
 
@@ -90,7 +90,7 @@ Backend:
 
 Frontend:
 
-- `VITE_API_URL` (e.g. Railway backend URL in production)
+- `VITE_API_URL` (e.g. `https://api.micaregister.com` in production)
 
 See `.env.example` and `frontend/.env.example` for local templates.
 
@@ -101,18 +101,35 @@ See `.env.example` and `frontend/.env.example` for local templates.
 - Connect repository to Railway
 - Ensure PostgreSQL service is attached
 - Set required env vars (`DATABASE_URL`, `CORS_ORIGINS`, `ADMIN_API_TOKEN`)
+- Add custom domain (recommended): `api.micaregister.com`
 - Optional cron: run `python scripts/run_railway_cron_update.py`
 
 ### Vercel (frontend)
 
 - Import `frontend` project
-- Set `VITE_API_URL` to your Railway backend URL
+- Set `VITE_API_URL` to your API domain (recommended: `https://api.micaregister.com`)
 - Build command: `npm run build`
 - Output directory: `dist`
 - Build output includes static prerendered pages for `/`, `/casp`, `/other`, `/art`, `/emt`, and `/ncasp`, plus entity detail pages (for example `/casp/{id}`) based on the latest API snapshot available during build.
 - `sitemap.xml` and `robots.txt` are generated during prerender from the same route set (including entity detail URLs when available at build time).
 - `micaregister.com` is redirected permanently (301) to `www.micaregister.com`.
 - Detail prerender validation: by default it fails on CI/Vercel (`PRERENDER_DETAIL_FAILURE_MODE=error`) and warns locally (`warn`) when detail pages cannot be generated or are below `PRERENDER_MIN_DETAIL_PAGES` (default `1`).
+
+## Public Feeds API
+
+Per-register feeds (public):
+
+- `GET /api/feeds` (index with feed links + docs + OpenAPI URL on current host)
+- `GET /api/feeds/{register}.json`
+- `GET /api/feeds/{register}.csv`
+
+Where `{register}` is one of: `casp`, `other`, `art`, `emt`, `ncasp`.
+
+Operational behavior:
+
+- Feed responses are cached in API process memory for 300 seconds.
+- Feed responses include `ETag` and `Cache-Control` headers for conditional requests and client/proxy caching.
+- Feed endpoints are rate limited to 30 requests per 60 seconds per client IP.
 
 ## Quality Checks
 

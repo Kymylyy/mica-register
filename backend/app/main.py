@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from .database import engine, get_db, Base
-from .routers import entities
+from .routers import entities, feeds
 import os
 
 # Create database tables
@@ -23,10 +23,10 @@ app.add_middleware(
 
 # Include routers
 app.include_router(entities.router, prefix="/api", tags=["entities"])
+app.include_router(feeds.router, prefix="/api", tags=["feeds"])
 
 
 @app.get("/")
 def root():
     return {"message": "MiCA Register API", "version": "1.0.0"}
-
 
