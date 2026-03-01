@@ -110,6 +110,8 @@ See `.env.example` and `frontend/.env.example` for local templates.
 - Build command: `npm run build`
 - Output directory: `dist`
 - Build output includes static prerendered pages for `/`, `/casp`, `/other`, `/art`, `/emt`, and `/ncasp`, plus entity detail pages (for example `/casp/{id}`) based on the latest API snapshot available during build.
+- `sitemap.xml` and `robots.txt` are generated during prerender from the same route set (including entity detail URLs when available at build time).
+- `micaregister.com` is redirected permanently (301) to `www.micaregister.com`.
 
 ## Quality Checks
 
