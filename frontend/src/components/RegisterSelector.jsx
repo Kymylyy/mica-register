@@ -46,7 +46,7 @@ export function RegisterSelector() {
     <div className="border-b border-gray-200 mb-6">
       <nav className="flex space-x-8" aria-label="Register type selection">
         {REGISTERS.map((register) => {
-          const isActive = currentPath === register.path;
+          const isActive = currentPath === register.path || currentPath.startsWith(`${register.path}/`);
 
           return (
             <Link
