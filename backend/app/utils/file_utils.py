@@ -15,14 +15,12 @@ from typing import Optional
 import re
 import sys
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# Import RegisterType (handle both direct run and module import)
 try:
-    from app.models import RegisterType
+    from ..models import RegisterType
 except ImportError:
-    from models import RegisterType
+    # Support direct script execution from backend/ by exposing the app package root.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from app.models import RegisterType
 
 
 def extract_date_from_filename(filename: str) -> Optional[date]:
@@ -157,9 +155,9 @@ def get_latest_csv_for_register(
     """
     # Import here to avoid circular dependency
     try:
-        from app.config.registers import get_register_config
+        from ..config.registers import get_register_config
     except ImportError:
-        from config.registers import get_register_config
+        from app.config.registers import get_register_config
 
     config = get_register_config(register_type)
     prefix = config.csv_prefix
@@ -281,9 +279,9 @@ def migrate_legacy_files(base_dir: Optional[Path] = None, dry_run: bool = False)
 
     # Import here to avoid circular dependency
     try:
-        from app.config.registers import get_register_config
+        from ..config.registers import get_register_config
     except ImportError:
-        from config.registers import get_register_config
+        from app.config.registers import get_register_config
 
     results = {
         'moved': [],

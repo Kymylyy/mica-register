@@ -57,7 +57,7 @@ If `DATABASE_URL` is not set, local SQLite is used.
 ### 3. Import data
 
 ```bash
-python3 backend/app/import_csv.py --all
+python3 backend/import_all_registers.py
 ```
 
 ### 4. Run backend
@@ -85,7 +85,7 @@ Backend:
 
 - `DATABASE_URL` (required in production)
 - `CORS_ORIGINS` (comma-separated allowed origins)
-- `ADMIN_API_TOKEN` (or `ADMIN_TOKEN`) for `/api/admin/*`
+- `ADMIN_API_TOKEN` (or `ADMIN_TOKEN`) for `/api/admin/*` and authenticated entity write endpoints
 - `DEEPSEEK_API_KEY` (optional, only for LLM remediation flows)
 
 Frontend:
@@ -101,6 +101,7 @@ See `.env.example` and `frontend/.env.example` for local templates.
 - Connect repository to Railway
 - Ensure PostgreSQL service is attached
 - Set required env vars (`DATABASE_URL`, `CORS_ORIGINS`, `ADMIN_API_TOKEN`)
+- Schema bootstrap in production happens via `backend/start.sh`, which runs the repo migrations before starting the API.
 - Add custom domain (recommended): `api.micaregister.com`
 - Optional cron: run `python scripts/run_railway_cron_update.py`
 

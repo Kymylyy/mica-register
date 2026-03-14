@@ -2,13 +2,10 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.orm import Session
-from .database import engine, get_db, Base
+from .database import get_db
 from .routers import entities, feeds
 from .config.registers import RegisterType
 import os
-
-# Create database tables
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="MiCA Register API", version="1.0.0")
 

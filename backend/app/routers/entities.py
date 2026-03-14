@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_, and_, func, distinct, exists, select
 from typing import List, Optional
 from datetime import date
-from ..database import get_db, engine, Base
+from ..database import get_db
 from ..models import (
     Entity, Service, PassportCountry, EntityTag,
     entity_service, casp_entity_service,  # Legacy and new association tables
@@ -584,21 +584,26 @@ def get_filter_counts(
 
 
 @router.post("/entities/{entity_id}/tags", response_model=EntityTagSchema)
-def add_tag(entity_id: int, tag: TagCreate, db: Session = Depends(get_db)):
+def add_tag(
+    entity_id: int,
+    tag: TagCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_token),
+):
     """Add a custom tag to an entity"""
     entity = db.query(Entity).filter(Entity.id == entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
-    
+
     # Check if tag already exists
     existing_tag = db.query(EntityTag).filter(
         EntityTag.entity_id == entity_id,
         EntityTag.tag_name == tag.tag_name
     ).first()
-    
+
     if existing_tag:
         raise HTTPException(status_code=400, detail="Tag already exists")
-    
+
     entity_tag = EntityTag(
         entity_id=entity_id,
         tag_name=tag.tag_name,
@@ -611,16 +616,21 @@ def add_tag(entity_id: int, tag: TagCreate, db: Session = Depends(get_db)):
 
 
 @router.delete("/entities/{entity_id}/tags/{tag_name}")
-def remove_tag(entity_id: int, tag_name: str, db: Session = Depends(get_db)):
+def remove_tag(
+    entity_id: int,
+    tag_name: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_token),
+):
     """Remove a tag from an entity"""
     tag = db.query(EntityTag).filter(
         EntityTag.entity_id == entity_id,
         EntityTag.tag_name == tag_name
     ).first()
-    
+
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
-    
+
     db.delete(tag)
     db.commit()
     return {"message": "Tag removed"}
@@ -630,16 +640,17 @@ def remove_tag(entity_id: int, tag_name: str, db: Session = Depends(get_db)):
 def update_entity(
     entity_id: int,
     update_data: EntityUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_token),
 ):
     """Update entity fields (currently only comments)"""
     entity = db.query(Entity).filter(Entity.id == entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
-    
+
     if update_data.comments is not None:
         entity.comments = update_data.comments
-    
+
     db.commit()
     db.refresh(entity)
     return entity
@@ -700,17 +711,14 @@ def import_data(
             status_code=404,
             detail=f"CSV file not found. Checked data/cleaned/ directory for CASP *_clean.csv files and fallback locations."
         )
-    
+
     try:
-        # Create tables if they don't exist
-        Base.metadata.create_all(bind=engine)
-        
         # Import data
         import_csv_to_db(db, csv_path)
-        
+
         # Get count of imported entities
         entity_count = db.query(Entity).count()
-        
+
         return {
             "message": "Data imported successfully",
             "csv_path": csv_path,
@@ -772,9 +780,6 @@ def import_all_registers(
         )
 
     try:
-        # Create tables if they don't exist
-        Base.metadata.create_all(bind=engine)
-
         # Import each register
         import_summary = {}
         for register_type, csv_path in register_files.items():
