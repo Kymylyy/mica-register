@@ -47,7 +47,7 @@ describe('App header last updated date', () => {
 
   it('renders dynamic date from metadata endpoint', async () => {
     mockGet.mockImplementation((url) => {
-      if (url.startsWith('/api/entities?')) {
+      if (url.startsWith('/api/casp/companies?')) {
         return Promise.resolve({ data: { items: [], total: 0 } });
       }
       if (url === '/api/metadata/last-updated') {
@@ -65,7 +65,7 @@ describe('App header last updated date', () => {
 
   it('falls back to N/A when metadata is unavailable', async () => {
     mockGet.mockImplementation((url) => {
-      if (url.startsWith('/api/entities?')) {
+      if (url.startsWith('/api/casp/companies?')) {
         return Promise.resolve({ data: { items: [], total: 0 } });
       }
       if (url === '/api/metadata/last-updated') {
@@ -87,18 +87,34 @@ describe('App header last updated date', () => {
 
   it('loads entity details when opening deep-link route', async () => {
     mockGet.mockImplementation((url) => {
-      if (url.startsWith('/api/entities?')) {
+      if (url.startsWith('/api/casp/companies?')) {
         return Promise.resolve({ data: { items: [], total: 0 } });
       }
-      if (url === '/api/entities/123') {
+      if (url === '/api/casp/companies/123') {
         return Promise.resolve({
           data: {
             id: 123,
             register_type: 'casp',
             commercial_name: 'Test CASP Entity',
             lei_name: 'Test CASP Entity',
+            lei: '529900032TYR45XIEW79',
             services: [],
             passport_countries: [],
+            record_count: 2,
+            authorisation_records: [
+              {
+                entity_id: 123,
+                authorisation_notification_date: '2025-11-21',
+                services: [],
+                passport_countries: [],
+              },
+              {
+                entity_id: 45,
+                authorisation_notification_date: '2025-04-01',
+                services: [],
+                passport_countries: [],
+              },
+            ],
           },
         });
       }
@@ -111,9 +127,52 @@ describe('App header last updated date', () => {
     renderApp('/casp/123');
 
     await waitFor(() => {
-      expect(mockGet).toHaveBeenCalledWith('/api/entities/123');
+      expect(mockGet).toHaveBeenCalledWith('/api/casp/companies/123');
     });
 
     expect(screen.getByRole('heading', { level: 2, name: 'Test CASP Entity' })).toBeTruthy();
+    expect(screen.getByText(/2 authorisation records/i)).toBeTruthy();
+  });
+
+  it('renders grouped CASP companies in the list', async () => {
+    mockGet.mockImplementation((url) => {
+      if (url.startsWith('/api/casp/companies?')) {
+        return Promise.resolve({
+          data: {
+            items: [
+              {
+                id: 123,
+                register_type: 'casp',
+                commercial_name: 'EUWAX AG',
+                lei_name: 'EUWAX AG',
+                lei: '529900032TYR45XIEW79',
+                home_member_state: 'DE',
+                lei_cou_code: 'DE',
+                authorisation_notification_date: '2025-11-21',
+                services: [{ code: 'e', description: 'Execution of orders' }],
+                passport_countries: [{ id: 1, country_code: 'DE' }],
+                record_count: 2,
+              },
+            ],
+            total: 1,
+          },
+        });
+      }
+      if (url === '/api/metadata/last-updated') {
+        return Promise.resolve({ data: { register_type: 'casp', last_updated: '2026-02-01' } });
+      }
+      return Promise.reject(new Error(`Unhandled URL in test: ${url}`));
+    });
+
+    renderApp('/casp');
+
+    await waitFor(() => {
+      expect(screen.getAllByText('EUWAX AG').length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getAllByText(/2 records/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText((_, element) => element?.textContent?.includes('1 Companies') ?? false).length
+    ).toBeGreaterThan(0);
   });
 });

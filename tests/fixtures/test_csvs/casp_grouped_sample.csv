@@ -1,0 +1,6 @@
+ae_competentAuthority,ae_lei,ae_lei_name,ae_commercial_name,ae_homeMemberState,ae_lei_cou_code,ae_website_platform,ac_authorisationNotificationDate,ac_authorisationEndDate,ac_serviceCode,ac_serviceCode_cou
+BaFin,529900032TYR45XIEW79,EUWAX AG,EUWAX AG,DE,DE,https://www.euwax-ag.de,01/04/2025,,c|d|e,AT|DE|ES|FR|GR|IT|SI|SK
+BaFin,529900032TYR45XIEW79,EUWAX AG,EUWAX AG,DE,DE,https://www.euwax-ag.de,21/11/2025,,e,DE
+AMF,11111111111111111111,Alpha Crypto France SAS,Alpha Crypto France,FR,FR,https://alpha-france.example,10/02/2025,,a,FR|BE
+AMF,11111111111111111111,Alpha Crypto France SAS,Alpha Crypto France,FR,FR,https://alpha-france.example,15/03/2025,,h,FR
+CSSF,22222222222222222222,Lux Digital Markets SA,Lux Digital Markets,LU,LU,https://lux.example,20/02/2024,,a,DE|FR

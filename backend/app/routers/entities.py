@@ -3,7 +3,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_, and_, func, distinct, exists, select
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import date
 from ..database import get_db
 from ..models import (
@@ -12,10 +12,14 @@ from ..models import (
     CaspEntity, OtherEntity, ArtEntity, EmtEntity, NcaspEntity, RegisterUpdateMetadata
 )
 from ..schemas import (
+    CaspCompanyDetail,
+    CaspCompanySummary,
+    CaspAuthorisationRecord,
     Entity as EntitySchema,
     EntityTag as EntityTagSchema,
     TagCreate,
     EntityUpdate,
+    PaginatedCaspCompanyResponse,
     PaginatedResponse,
     LastUpdatedResponse,
 )
@@ -213,6 +217,235 @@ def apply_search_filter(query, search: str, register_type: RegisterType = Regist
     return query
 
 
+def _get_casp_service_filter_subquery(service_codes: List[str]):
+    return (
+        select(CaspEntity.id)
+        .join(CaspEntity.services)
+        .filter(Service.code.in_(service_codes))
+        .group_by(CaspEntity.id)
+        .having(func.count(Service.code) == len(service_codes))
+    )
+
+
+def _apply_casp_row_filters(
+    query,
+    home_member_states: Optional[List[str]] = None,
+    service_codes: Optional[List[str]] = None,
+    search: Optional[str] = None,
+    auth_date_from: Optional[date] = None,
+    auth_date_to: Optional[date] = None,
+):
+    query = apply_home_member_state_filter(query, home_member_states)
+
+    if service_codes and len(service_codes) > 0:
+        query = query.filter(Entity.id.in_(_get_casp_service_filter_subquery(service_codes)))
+
+    if search:
+        query = apply_search_filter(query, search, RegisterType.CASP)
+
+    if auth_date_from:
+        query = query.filter(Entity.authorisation_notification_date >= auth_date_from)
+
+    if auth_date_to:
+        query = query.filter(Entity.authorisation_notification_date <= auth_date_to)
+
+    return query
+
+
+def _normalize_lei(lei: Optional[str]) -> Optional[str]:
+    if not lei:
+        return None
+    lei = lei.strip()
+    return lei or None
+
+
+def _casp_group_key(entity: Entity) -> str:
+    return _normalize_lei(entity.lei) or f"entity:{entity.id}"
+
+
+def _date_ordinal(value: Optional[date]) -> int:
+    return value.toordinal() if value else 0
+
+
+def _primary_casp_entity(entity: Entity) -> tuple[int, int, int, int, int]:
+    return (
+        _date_ordinal(entity.last_update),
+        _date_ordinal(entity.authorisation_notification_date),
+        len(entity.services or []),
+        len(entity.passport_countries or []),
+        -entity.id,
+    )
+
+
+def _record_sort_key(entity: Entity) -> tuple[int, int, int]:
+    return (
+        _date_ordinal(entity.authorisation_notification_date),
+        _date_ordinal(entity.last_update),
+        entity.id,
+    )
+
+
+def _serialize_service(service: Service) -> Dict[str, Any]:
+    return {
+        "id": service.id,
+        "code": service.code,
+        "description": service.description,
+    }
+
+
+def _serialize_passport_country(country: PassportCountry) -> Dict[str, Any]:
+    return {
+        "id": country.id,
+        "country_code": country.country_code,
+    }
+
+
+def _collect_services(entities: List[Entity]) -> List[Dict[str, Any]]:
+    services_by_code: Dict[str, Service] = {}
+    for entity in entities:
+        for service in entity.services or []:
+            services_by_code.setdefault(service.code, service)
+    return [
+        _serialize_service(services_by_code[code])
+        for code in sorted(services_by_code.keys())
+    ]
+
+
+def _collect_passport_countries(entities: List[Entity]) -> List[Dict[str, Any]]:
+    countries_by_code: Dict[str, PassportCountry] = {}
+    for entity in entities:
+        for country in entity.passport_countries or []:
+            countries_by_code.setdefault(country.country_code, country)
+    return [
+        _serialize_passport_country(countries_by_code[code])
+        for code in sorted(countries_by_code.keys())
+    ]
+
+
+def _serialize_casp_authorisation_record(entity: Entity) -> Dict[str, Any]:
+    return {
+        "entity_id": entity.id,
+        "authorisation_notification_date": entity.authorisation_notification_date,
+        "authorisation_end_date": entity.authorisation_end_date,
+        "last_update": entity.last_update,
+        "services": [_serialize_service(service) for service in sorted(entity.services or [], key=lambda item: item.code)],
+        "passport_countries": [
+            _serialize_passport_country(country)
+            for country in sorted(entity.passport_countries or [], key=lambda item: item.country_code)
+        ],
+        "comments": entity.comments,
+        "website_platform": entity.website_platform,
+    }
+
+
+def _build_casp_company_payload(entities: List[Entity]) -> Dict[str, Any]:
+    primary = max(entities, key=_primary_casp_entity)
+    records = [
+        _serialize_casp_authorisation_record(entity)
+        for entity in sorted(entities, key=_record_sort_key)
+    ]
+    latest_auth_date = max((entity.authorisation_notification_date for entity in entities if entity.authorisation_notification_date), default=None)
+    latest_last_update = max((entity.last_update for entity in entities if entity.last_update), default=None)
+
+    return {
+        "id": primary.id,
+        "register_type": RegisterType.CASP.value,
+        "competent_authority": primary.competent_authority,
+        "home_member_state": primary.home_member_state,
+        "lei_name": primary.lei_name,
+        "lei": primary.lei,
+        "lei_cou_code": primary.lei_cou_code,
+        "commercial_name": primary.commercial_name,
+        "address": primary.address,
+        "website": primary.website,
+        "authorisation_notification_date": latest_auth_date,
+        "last_update": latest_last_update,
+        "comments": primary.comments,
+        "website_platform": primary.website_platform,
+        "authorisation_end_date": primary.authorisation_end_date,
+        "services": _collect_services(entities),
+        "passport_countries": _collect_passport_countries(entities),
+        "tags": [
+            {
+                "id": tag.id,
+                "entity_id": tag.entity_id,
+                "tag_name": tag.tag_name,
+                "tag_value": tag.tag_value,
+            }
+            for tag in primary.tags or []
+        ],
+        "record_count": len(entities),
+        "authorisation_records": records,
+    }
+
+
+def _load_all_rows_for_casp_groups(db: Session, seed_entities: List[Entity]) -> List[Entity]:
+    leis = sorted({_normalize_lei(entity.lei) for entity in seed_entities if _normalize_lei(entity.lei)})
+    singleton_ids = sorted([entity.id for entity in seed_entities if not _normalize_lei(entity.lei)])
+
+    conditions = []
+    if leis:
+        conditions.append(Entity.lei.in_(leis))
+    if singleton_ids:
+        conditions.append(Entity.id.in_(singleton_ids))
+    if not conditions:
+        return []
+
+    return (
+        db.query(Entity)
+        .options(*ENTITY_EAGER_LOAD_OPTIONS)
+        .filter(Entity.register_type == RegisterType.CASP)
+        .filter(or_(*conditions))
+        .all()
+    )
+
+
+def _group_casp_entities(entities: List[Entity]) -> Dict[str, List[Entity]]:
+    grouped: Dict[str, List[Entity]] = {}
+    for entity in entities:
+        grouped.setdefault(_casp_group_key(entity), []).append(entity)
+    return grouped
+
+
+def _sort_casp_company_payloads(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return sorted(
+        items,
+        key=lambda item: (
+            -_date_ordinal(item.get("authorisation_notification_date")),
+            (item.get("commercial_name") or item.get("lei_name") or "").lower(),
+            item["id"],
+        ),
+    )
+
+
+def _get_grouped_casp_companies(
+    db: Session,
+    home_member_states: Optional[List[str]] = None,
+    service_codes: Optional[List[str]] = None,
+    search: Optional[str] = None,
+    auth_date_from: Optional[date] = None,
+    auth_date_to: Optional[date] = None,
+) -> List[Dict[str, Any]]:
+    matching_rows = _apply_casp_row_filters(
+        db.query(Entity).options(*ENTITY_EAGER_LOAD_OPTIONS).filter(Entity.register_type == RegisterType.CASP),
+        home_member_states=home_member_states,
+        service_codes=service_codes,
+        search=search,
+        auth_date_from=auth_date_from,
+        auth_date_to=auth_date_to,
+    ).all()
+
+    if not matching_rows:
+        return []
+
+    full_group_rows = _load_all_rows_for_casp_groups(db, matching_rows)
+    grouped = _group_casp_entities(full_group_rows)
+    return _sort_casp_company_payloads([
+        _build_casp_company_payload(group_rows)
+        for group_rows in grouped.values()
+    ])
+
+
 @router.get("/entities", response_model=PaginatedResponse)
 def get_entities(
     skip: int = Query(0, ge=0),
@@ -247,16 +480,7 @@ def get_entities(
     # Service codes filter - only applicable for CASP
     if service_codes and len(service_codes) > 0:
         if register_type == RegisterType.CASP:
-            # AND logic: entity must have ALL selected services
-            # Count how many selected services each entity has
-            service_count_subquery = (
-                select(CaspEntity.id)
-                .join(CaspEntity.services)
-                .filter(Service.code.in_(service_codes))
-                .group_by(CaspEntity.id)
-                .having(func.count(Service.code) == len(service_codes))
-            )
-            query = query.filter(Entity.id.in_(service_count_subquery))
+            query = query.filter(Entity.id.in_(_get_casp_service_filter_subquery(service_codes)))
         # For other registers, ignore service_codes filter
 
     if search:
@@ -284,6 +508,37 @@ def get_entities(
     )
 
 
+@router.get("/casp/companies", response_model=PaginatedCaspCompanyResponse)
+def get_casp_companies(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    home_member_states: Optional[List[str]] = Query(None),
+    service_codes: Optional[List[str]] = Query(None),
+    search: Optional[str] = None,
+    auth_date_from: Optional[date] = None,
+    auth_date_to: Optional[date] = None,
+    db: Session = Depends(get_db)
+):
+    """Get grouped CASP companies with pagination metadata."""
+    companies = _get_grouped_casp_companies(
+        db,
+        home_member_states=home_member_states,
+        service_codes=service_codes,
+        search=search,
+        auth_date_from=auth_date_from,
+        auth_date_to=auth_date_to,
+    )
+    total = len(companies)
+    paginated_items = companies[skip:skip + limit]
+    return PaginatedCaspCompanyResponse(
+        items=paginated_items,
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=(skip + limit) < total,
+    )
+
+
 @router.get("/entities/count")
 def get_entities_count(
     register_type: RegisterType = Query(RegisterType.CASP, description="Register type to query"),
@@ -306,15 +561,7 @@ def get_entities_count(
     # Service codes filter - only for CASP
     if service_codes and len(service_codes) > 0:
         if register_type == RegisterType.CASP:
-            # AND logic: entity must have ALL selected services
-            service_count_subquery = (
-                select(CaspEntity.id)
-                .join(CaspEntity.services)
-                .filter(Service.code.in_(service_codes))
-                .group_by(CaspEntity.id)
-                .having(func.count(Service.code) == len(service_codes))
-            )
-            query = query.filter(Entity.id.in_(service_count_subquery))
+            query = query.filter(Entity.id.in_(_get_casp_service_filter_subquery(service_codes)))
 
     if search:
         query = apply_search_filter(query, search, register_type)
@@ -327,6 +574,22 @@ def get_entities_count(
 
     count = query.count()
     return {"count": count}
+
+
+@router.get("/casp/companies/{entity_id}", response_model=CaspCompanyDetail)
+def get_casp_company(entity_id: int, db: Session = Depends(get_db)):
+    """Get grouped CASP company detail by any raw CASP entity id in the group."""
+    entity = (
+        db.query(Entity)
+        .options(*ENTITY_EAGER_LOAD_OPTIONS)
+        .filter(Entity.id == entity_id, Entity.register_type == RegisterType.CASP)
+        .first()
+    )
+    if not entity:
+        raise HTTPException(status_code=404, detail="CASP company not found")
+
+    group_rows = _load_all_rows_for_casp_groups(db, [entity])
+    return CaspCompanyDetail(**_build_casp_company_payload(group_rows))
 
 
 @router.get("/metadata/last-updated", response_model=LastUpdatedResponse)
@@ -470,6 +733,48 @@ def get_filter_options(
     }
 
     return result
+
+
+@router.get("/casp/filters/counts")
+def get_casp_filter_counts(
+    home_member_states: Optional[List[str]] = Query(None),
+    service_codes: Optional[List[str]] = Query(None),
+    search: Optional[str] = None,
+    auth_date_from: Optional[date] = None,
+    auth_date_to: Optional[date] = None,
+    db: Session = Depends(get_db)
+):
+    """Get grouped CASP filter counts using company-level totals."""
+    mica_service_codes = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}
+    country_counts: Dict[str, int] = {}
+    service_counts = {code: 0 for code in sorted(mica_service_codes)}
+
+    companies = _get_grouped_casp_companies(
+        db,
+        home_member_states=home_member_states,
+        service_codes=service_codes,
+        search=search,
+        auth_date_from=auth_date_from,
+        auth_date_to=auth_date_to,
+    )
+
+    for company in companies:
+        country_code = (company.get("home_member_state") or company.get("lei_cou_code") or "").strip()
+        if country_code:
+            country_counts[country_code] = country_counts.get(country_code, 0) + 1
+
+        service_codes_in_group = {
+            service["code"]
+            for service in company.get("services", [])
+            if service["code"] in mica_service_codes
+        }
+        for code in service_codes_in_group:
+            service_counts[code] = service_counts.get(code, 0) + 1
+
+    return {
+        "country_counts": country_counts,
+        "service_counts": service_counts,
+    }
 
 
 @router.get("/filters/counts")

@@ -18,6 +18,7 @@ Backend API docs (recommended custom domain): `https://api.micaregister.com/docs
   - NCASP (Non-compliant entities)
 - Fast filtering by name, country, LEI, services, dates, and register-specific fields
 - Shareable entity deep links (for example `/casp/{entity_id}`) that open details directly
+- CASP list and detail views group duplicate LEI rows into one company card with multiple authorisation records
 - Home Member State filtering falls back to LEI country when ESMA country is missing
 - Backend API for search, filtering, and admin imports
 - Data update scripts for download, validation, cleaning, and import
@@ -128,6 +129,11 @@ Per-register feeds (public):
   - `GET /sitemap.xml`
 
 Where `{register}` is one of: `casp`, `other`, `art`, `emt`, `ncasp`.
+
+CASP grouped UI behavior:
+
+- The web UI groups CASP entries by LEI for list and detail views.
+- Public CASP feed endpoints remain raw-row exports of the underlying ESMA-style data.
 
 Operational behavior:
 
