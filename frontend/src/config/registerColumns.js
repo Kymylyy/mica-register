@@ -80,8 +80,8 @@ const COMMON_COLUMNS = [
 const CASP_SPECIFIC_COLUMNS = [
   {
     id: 'authorisation_notification_date',
-    label: 'Auth. Date',
-    description: 'Authorization/notification date',
+    label: 'Latest Auth. Date',
+    description: 'Latest authorization/notification date across authorisation records',
     visible: true,
   },
   {
@@ -449,7 +449,7 @@ export function getRegisterShortName(registerType) {
  */
 export function getRegisterCounterLabel(registerType) {
   const labels = {
-    casp: 'Entities',       // CASPs are entities
+    casp: 'Companies',
     other: 'WHITE PAPERS',   // OTHER register = whitepapers
     art: 'Whitepapers',     // ART register = whitepapers for asset-referenced tokens
     emt: 'WHITE PAPERS',     // EMT register = whitepapers for e-money tokens

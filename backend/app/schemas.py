@@ -149,3 +149,51 @@ class LastUpdatedResponse(BaseModel):
     """Per-register latest update date used by frontend header."""
     register_type: RegisterTypeEnum
     last_updated: Optional[date] = None
+
+
+class CaspAuthorisationRecord(BaseModel):
+    entity_id: int
+    authorisation_notification_date: Optional[date] = None
+    authorisation_end_date: Optional[date] = None
+    last_update: Optional[date] = None
+    services: List[Service] = []
+    passport_countries: List[PassportCountry] = []
+    comments: Optional[str] = None
+    website_platform: Optional[str] = None
+
+
+class CaspCompanySummary(BaseModel):
+    id: int
+    register_type: RegisterTypeEnum = RegisterTypeEnum.CASP
+    competent_authority: Optional[str] = None
+    home_member_state: Optional[str] = None
+    lei_name: Optional[str] = None
+    lei: Optional[str] = None
+    lei_cou_code: Optional[str] = None
+    commercial_name: Optional[str] = None
+    address: Optional[str] = None
+    website: Optional[str] = None
+    authorisation_notification_date: Optional[date] = None
+    last_update: Optional[date] = None
+    comments: Optional[str] = None
+    website_platform: Optional[str] = None
+    authorisation_end_date: Optional[date] = None
+    services: List[Service] = []
+    passport_countries: List[PassportCountry] = []
+    tags: List[EntityTag] = []
+    record_count: int
+
+
+class CaspCompanyDetail(CaspCompanySummary):
+    authorisation_records: List[CaspAuthorisationRecord] = []
+
+
+class PaginatedCaspCompanyResponse(BaseModel):
+    items: List[CaspCompanySummary]
+    total: int
+    skip: int
+    limit: int
+    has_more: bool
+
+    class Config:
+        from_attributes = True

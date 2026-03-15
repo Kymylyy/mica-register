@@ -110,6 +110,24 @@ function formatHeaderDate(isoDate) {
   return `${day} ${monthName} ${year}`;
 }
 
+function getListEndpoint(registerType, params) {
+  if (registerType === 'casp') {
+    return `/api/casp/companies?${params.toString()}`;
+  }
+  return `/api/entities?${params.toString()}`;
+}
+
+function getDetailEndpoint(registerType, entityId) {
+  if (registerType === 'casp') {
+    return `/api/casp/companies/${entityId}`;
+  }
+  return `/api/entities/${entityId}`;
+}
+
+function hasGroupedAuthorisationRecords(entity) {
+  return entity?.register_type === 'casp' && Array.isArray(entity?.authorisation_records);
+}
+
 function App({ registerType = 'casp' }) {
   const navigate = useNavigate();
   const { entityId: entityIdParam } = useParams();
@@ -167,7 +185,7 @@ function App({ registerType = 'casp' }) {
       if (filters.auth_date_from) params.append('auth_date_from', filters.auth_date_from);
       if (filters.auth_date_to) params.append('auth_date_to', filters.auth_date_to);
 
-      const entitiesRes = await api.get(`/api/entities?${params.toString()}`, {
+      const entitiesRes = await api.get(getListEndpoint(registerType, params), {
         signal: abortController.signal
       });
 
@@ -312,11 +330,15 @@ function App({ registerType = 'casp' }) {
 
     let cancelled = false;
 
-    api.get(`/api/entities/${parsedEntityId}`)
+    api.get(getDetailEndpoint(registerType, parsedEntityId))
       .then((response) => {
         if (cancelled) return;
 
         const entity = response.data;
+
+        if (registerType === 'casp' && entity?.id && entity.id !== parsedEntityId) {
+          navigate(buildEntityPath(entity.id), { replace: true });
+        }
 
         // Keep URL and content coherent if entity belongs to another register
         if (entity?.register_type && entity.register_type !== registerType) {
@@ -349,7 +371,7 @@ function App({ registerType = 'casp' }) {
     return () => {
       cancelled = true;
     };
-  }, [entityIdParam, registerType, navigate, registerBasePath]);
+  }, [entityIdParam, registerType, navigate, registerBasePath, buildEntityPath]);
 
   // Update document SEO metadata for register list pages and entity detail routes
   useEffect(() => {
@@ -604,7 +626,15 @@ function App({ registerType = 'casp' }) {
                           <span>{selectedEntity.competent_authority}</span>
                         </>
                       )}
-                      {selectedEntity.authorisation_notification_date && (
+                      {registerType === 'casp' && hasGroupedAuthorisationRecords(selectedEntity) && (
+                        <>
+                          <span>•</span>
+                          <span>
+                            {selectedEntity.record_count || selectedEntity.authorisation_records.length} authorisation records
+                          </span>
+                        </>
+                      )}
+                      {selectedEntity.authorisation_notification_date && !hasGroupedAuthorisationRecords(selectedEntity) && (
                         <>
                           <span>•</span>
                           <span>Authorised: {formatDate(selectedEntity.authorisation_notification_date)}</span>
@@ -754,36 +784,6 @@ function App({ registerType = 'casp' }) {
 
                   {/* Right column: Register-specific details */}
                   <div>
-                    {/* CASP: Services */}
-                    {registerType === 'casp' && (
-                      <>
-                        <div className="flex items-center gap-2 mb-3">
-                          <svg className="h-4 w-4 text-textSoft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                          </svg>
-                          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-textSoft">
-                            Services
-                          </h3>
-                        </div>
-                        {selectedEntity.services && selectedEntity.services.length > 0 ? (
-                          <div className="space-y-2 text-sm text-textMain">
-                            {[...selectedEntity.services]
-                              .sort((a, b) => getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code))
-                              .map((service, idx) => {
-                                const mediumName = getServiceMediumName(service.code);
-                                return (
-                                  <div key={idx} className="pb-2 border-b border-borderSubtle last:border-0 last:pb-0">
-                                    {mediumName}
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        ) : (
-                          <p className="text-textMuted text-sm font-medium">-</p>
-                        )}
-                      </>
-                    )}
-
                     {/* OTHER: White Paper & Linked CASP */}
                     {registerType === 'other' && (
                       <dl className="space-y-3">
@@ -1041,8 +1041,101 @@ function App({ registerType = 'casp' }) {
                   </div>
                 </div>
 
+                {registerType === 'casp' && (
+                  <div className="mt-8">
+                    <div className="h-px bg-borderSubtle mb-4" />
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="h-4 w-4 text-textSoft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                      </svg>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-textSoft">
+                        Authorisation Records
+                      </h3>
+                    </div>
+                    {selectedEntity.authorisation_records && selectedEntity.authorisation_records.length > 0 ? (
+                      <div className="space-y-4">
+                        {selectedEntity.authorisation_records.map((record, idx) => (
+                          <section key={record.entity_id || idx} className="rounded-xl border border-borderSubtle bg-surfaceAlt/40 p-4 md:p-5">
+                            <div className="space-y-4">
+                              <div className="border-b border-borderSubtle pb-3">
+                                <h4 className="text-sm font-semibold text-textMain">
+                                  Authorisation {idx + 1}
+                                </h4>
+                                <p className="mt-1 text-sm text-textMuted">
+                                  {record.authorisation_notification_date
+                                    ? formatDate(record.authorisation_notification_date)
+                                    : 'Authorisation date unavailable'}
+                                </p>
+                              </div>
+
+                              <dl className="space-y-4 text-sm text-textMain">
+                                <div>
+                                  <dt className="text-xs font-medium uppercase tracking-wide text-textSoft mb-2">Services</dt>
+                                  {record.services && record.services.length > 0 ? (
+                                    <dd className="space-y-2">
+                                      {[...record.services]
+                                        .sort((a, b) => getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code))
+                                        .map((service) => (
+                                          <div key={service.code} className="rounded-lg border border-borderSubtle bg-white px-3 py-2">
+                                            {getServiceMediumName(service.code)}
+                                          </div>
+                                        ))}
+                                    </dd>
+                                  ) : (
+                                    <dd className="text-textMuted">-</dd>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <dt className="text-xs font-medium uppercase tracking-wide text-textSoft mb-2">Passport Countries</dt>
+                                  {record.passport_countries && record.passport_countries.length > 0 ? (
+                                    <dd className="flex flex-wrap gap-1.5">
+                                      {record.passport_countries.map((country) => (
+                                        <span key={country.country_code} className="inline-flex items-center gap-1 rounded-md bg-white border border-borderSubtle px-2 py-[2px] text-xs text-textMuted">
+                                          <FlagIcon countryCode={country.country_code} size="xs" />
+                                          <span>{country.country_code}</span>
+                                        </span>
+                                      ))}
+                                    </dd>
+                                  ) : (
+                                    <dd className="text-textMuted">-</dd>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <dt className="text-xs font-medium uppercase tracking-wide text-textSoft mb-1">End Date</dt>
+                                  <dd>{record.authorisation_end_date ? formatDate(record.authorisation_end_date) : '-'}</dd>
+                                </div>
+
+                                <div>
+                                  <dt className="text-xs font-medium uppercase tracking-wide text-textSoft mb-1">Last Update</dt>
+                                  <dd>{record.last_update ? formatDate(record.last_update) : '-'}</dd>
+                                </div>
+
+                                <div>
+                                  <dt className="text-xs font-medium uppercase tracking-wide text-textSoft mb-1">Platform</dt>
+                                  <dd>{record.website_platform || '-'}</dd>
+                                </div>
+
+                                {record.comments && (
+                                  <div>
+                                    <dt className="text-xs font-medium uppercase tracking-wide text-textSoft mb-1">Comments</dt>
+                                    <dd className="whitespace-pre-wrap text-sm text-textMain">{record.comments}</dd>
+                                  </div>
+                                )}
+                              </dl>
+                            </div>
+                          </section>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-textMuted text-sm font-medium">-</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Passport Countries - separate block at bottom (CASP only) */}
-                {registerType === 'casp' && selectedEntity.passport_countries && selectedEntity.passport_countries.length > 0 && (
+                {registerType === 'casp' && !hasGroupedAuthorisationRecords(selectedEntity) && selectedEntity.passport_countries && selectedEntity.passport_countries.length > 0 && (
                   <div className="mt-6">
                     <div className="h-px bg-borderSubtle mb-4" />
                     <div className="flex items-center gap-2 mb-2">
@@ -1065,7 +1158,7 @@ function App({ registerType = 'casp' }) {
                 )}
 
                 {/* Comments - separate block */}
-                {selectedEntity.comments && (
+                {selectedEntity.comments && !hasGroupedAuthorisationRecords(selectedEntity) && (
                   <div className="mt-6">
                     <div className="h-px bg-borderSubtle mb-4" />
                     <div className="flex items-center gap-2 mb-2">
@@ -1083,7 +1176,7 @@ function App({ registerType = 'casp' }) {
                 )}
 
                 {/* Last Update - separate block */}
-                {selectedEntity.last_update && (
+                {selectedEntity.last_update && !hasGroupedAuthorisationRecords(selectedEntity) && (
                   <div className="mt-6">
                     <div className="h-px bg-borderSubtle mb-4" />
                     <div className="flex items-center gap-2 mb-2">

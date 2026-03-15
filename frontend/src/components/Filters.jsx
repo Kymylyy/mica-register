@@ -204,7 +204,11 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
     }
 
     // Single request gets both country_counts and service_counts (optimized backend)
-    api.get(`/api/filters/counts?${params.toString()}`, {
+    const countsEndpoint = registerType === 'casp'
+      ? `/api/casp/filters/counts?${params.toString()}`
+      : `/api/filters/counts?${params.toString()}`;
+
+    api.get(countsEndpoint, {
       signal: abortController.signal
     })
       .then(response => {

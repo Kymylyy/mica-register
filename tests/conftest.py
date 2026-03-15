@@ -130,12 +130,33 @@ def ncasp_sample_csv():
 
 
 @pytest.fixture
+def casp_grouped_sample_csv():
+    """Path to CASP grouped sample CSV"""
+    return FIXTURE_DIR / "casp_grouped_sample.csv"
+
+
+@pytest.fixture
 def db_with_casp_data(db_session, casp_sample_csv):
     """Database with loaded CASP data"""
     from backend.app.import_csv import import_csv_to_db
 
     import_csv_to_db(db_session, str(casp_sample_csv), RegisterType.CASP)
     return db_session
+
+
+@pytest.fixture
+def db_with_grouped_casp_data(db_session, casp_grouped_sample_csv):
+    """Database with duplicate-LEI CASP data for grouped company tests"""
+    from backend.app.import_csv import import_csv_to_db
+
+    import_csv_to_db(db_session, str(casp_grouped_sample_csv), RegisterType.CASP)
+    return db_session
+
+
+@pytest.fixture
+def db_with_casp_grouped_data(db_with_grouped_casp_data):
+    """Backward-compatible alias for grouped CASP fixture."""
+    return db_with_grouped_casp_data
 
 
 @pytest.fixture
