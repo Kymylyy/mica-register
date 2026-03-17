@@ -36,17 +36,6 @@ const createCellRenderer = (columnId, options = {}) => {
         const row = info.row.original;
         const primaryLabel = commercialName && commercialName.trim() ? commercialName : (row.lei_name || '-');
         const href = getEntityHref ? getEntityHref(row) : null;
-        const recordCount = row.record_count || 0;
-        const label = (
-          <span className="inline-flex items-center gap-2">
-            <span>{primaryLabel}</span>
-            {recordCount > 1 && (
-              <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
-                {recordCount} records
-              </span>
-            )}
-          </span>
-        );
 
         if (href && onEntityActivate) {
           return (
@@ -71,15 +60,15 @@ const createCellRenderer = (columnId, options = {}) => {
               }}
               className="font-medium text-slate-900 hover:text-sky-700 hover:underline"
             >
-              {label}
+              {primaryLabel}
             </a>
           );
         }
 
         if (commercialName && commercialName.trim()) {
-          return <span className="font-medium">{label}</span>;
+          return <span className="font-medium">{primaryLabel}</span>;
         }
-        return <span className="font-medium">{label}</span>;
+        return <span className="font-medium">{primaryLabel}</span>;
       };
 
     case 'home_member_state':
@@ -442,7 +431,6 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp', getE
           const homeState = getPrimaryCountryCode(entity.home_member_state, entity.lei_cou_code);
           const authDate = entity.authorisation_notification_date;
           const services = entity.services || [];
-          const recordCount = entity.record_count || 0;
           const sortedServices = [...services].sort((a, b) => 
             getServiceCodeOrder(a.code) - getServiceCodeOrder(b.code)
           );
@@ -487,13 +475,6 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp', getE
                     commercialName
                   )}
                 </h3>
-                {recordCount > 1 && (
-                  <div className="mb-2">
-                    <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
-                      {recordCount} records
-                    </span>
-                  </div>
-                )}
                 <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                   {homeState && (
                     <div className="flex items-center gap-1.5">

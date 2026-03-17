@@ -170,7 +170,7 @@ describe('App header last updated date', () => {
       expect(screen.getAllByText('EUWAX AG').length).toBeGreaterThan(0);
     });
 
-    expect(screen.getAllByText(/2 records/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/2 records/i)).toBeNull();
     expect(
       screen.getAllByText((_, element) => element?.textContent?.includes('1 Companies') ?? false).length
     ).toBeGreaterThan(0);
