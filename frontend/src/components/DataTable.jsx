@@ -2,7 +2,6 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
   getFilteredRowModel,
   flexRender,
   createColumnHelper,
@@ -260,8 +259,15 @@ const createCellRenderer = (columnId, options = {}) => {
   }
 };
 
-export function DataTable({ data, onRowClick, count, registerType = 'casp', getEntityHref = null }) {
-  const [sorting, setSorting] = useState([]);
+export function DataTable({
+  data,
+  onRowClick,
+  count,
+  registerType = 'casp',
+  sorting = [],
+  onSortingChange = () => {},
+  getEntityHref = null,
+}) {
 
   const defaultColumnVisibility = useMemo(
     () => getDefaultColumnVisibility(registerType),
@@ -286,6 +292,15 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp', getE
   useEffect(() => {
     setColumnVisibility(defaultColumnVisibility);
   }, [registerType, defaultColumnVisibility]);
+
+  useEffect(() => {
+    const activeSortColumnId = sorting?.[0]?.id;
+    if (!activeSortColumnId) return;
+
+    if (columnVisibility[activeSortColumnId] === false) {
+      onSortingChange([]);
+    }
+  }, [sorting, columnVisibility, onSortingChange]);
 
   // Close details when clicking outside or pressing Escape
   useEffect(() => {
@@ -335,14 +350,14 @@ export function DataTable({ data, onRowClick, count, registerType = 'casp', getE
   const table = useReactTable({
     data,
     columns,
+    manualSorting: true,
     state: {
       sorting,
       columnVisibility,
     },
-    onSortingChange: setSorting,
+    onSortingChange,
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
 

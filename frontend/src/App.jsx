@@ -128,12 +128,23 @@ function hasGroupedAuthorisationRecords(entity) {
   return entity?.register_type === 'casp' && Array.isArray(entity?.authorisation_records);
 }
 
+function getActiveSort(sorting) {
+  const [primarySort] = sorting || [];
+  if (!primarySort?.id) return null;
+
+  return {
+    sortBy: primarySort.id,
+    sortDir: primarySort.desc ? 'desc' : 'asc',
+  };
+}
+
 function App({ registerType = 'casp' }) {
   const navigate = useNavigate();
   const { entityId: entityIdParam } = useParams();
   const [entities, setEntities] = useState([]);
   const [count, setCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sorting, setSorting] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [filters, setFilters] = useState({});
@@ -185,6 +196,12 @@ function App({ registerType = 'casp' }) {
       if (filters.auth_date_from) params.append('auth_date_from', filters.auth_date_from);
       if (filters.auth_date_to) params.append('auth_date_to', filters.auth_date_to);
 
+      const activeSort = getActiveSort(sorting);
+      if (activeSort) {
+        params.append('sort_by', activeSort.sortBy);
+        params.append('sort_dir', activeSort.sortDir);
+      }
+
       const entitiesRes = await api.get(getListEndpoint(registerType, params), {
         signal: abortController.signal
       });
@@ -214,7 +231,7 @@ function App({ registerType = 'casp' }) {
         setLoading(false);
       }
     }
-  }, [filters, debouncedSearch, registerType, currentPage]);
+  }, [filters, debouncedSearch, registerType, currentPage, sorting]);
 
   // Cleanup abort controller on unmount
   useEffect(() => {
@@ -243,6 +260,7 @@ function App({ registerType = 'casp' }) {
     // The filters effect below will handle fetching with new registerType
     setFilters({});
     setCurrentPage(1);
+    setSorting([]);
     setSelectedEntity(null);
   }, [registerType]);
 
@@ -290,6 +308,11 @@ function App({ registerType = 'casp' }) {
   const handleClearFilters = () => {
     setFilters({});
     setCurrentPage(1);
+  };
+
+  const handleSortingChange = (updater) => {
+    setCurrentPage(1);
+    setSorting(updater);
   };
 
   const handleRowClick = useCallback((entity) => {
@@ -539,6 +562,8 @@ function App({ registerType = 'casp' }) {
                 onRowClick={handleRowClick}
                 count={count}
                 registerType={registerType}
+                sorting={sorting}
+                onSortingChange={handleSortingChange}
                 getEntityHref={(entity) => buildEntityPath(entity.id)}
               />
               <div className="mt-4 mb-2 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
