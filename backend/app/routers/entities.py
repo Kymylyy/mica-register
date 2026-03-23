@@ -1,4 +1,5 @@
 import os
+from functools import cmp_to_key
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
 from sqlalchemy.orm import Session, selectinload
@@ -8,13 +9,11 @@ from datetime import date
 from ..database import get_db
 from ..models import (
     Entity, Service, PassportCountry, EntityTag,
-    entity_service, casp_entity_service,  # Legacy and new association tables
+    casp_entity_service,  # New association table
     CaspEntity, OtherEntity, ArtEntity, EmtEntity, NcaspEntity, RegisterUpdateMetadata
 )
 from ..schemas import (
     CaspCompanyDetail,
-    CaspCompanySummary,
-    CaspAuthorisationRecord,
     Entity as EntitySchema,
     EntityTag as EntityTagSchema,
     TagCreate,
@@ -45,6 +44,73 @@ ENTITY_EAGER_LOAD_OPTIONS = [
     selectinload(Entity.emt_entity),
     selectinload(Entity.ncasp_entity),
 ]
+
+COMMON_SORT_FIELDS = {
+    "commercial_name",
+    "lei_name",
+    "lei",
+    "lei_cou_code",
+    "home_member_state",
+    "competent_authority",
+    "address",
+    "website",
+    "comments",
+    "last_update",
+}
+
+REGISTER_SORT_FIELDS = {
+    RegisterType.CASP: COMMON_SORT_FIELDS | {
+        "authorisation_notification_date",
+        "services",
+        "passport_countries",
+        "authorisation_end_date",
+        "website_platform",
+    },
+    RegisterType.OTHER: COMMON_SORT_FIELDS | {
+        "white_paper_url",
+        "lei_casp",
+        "lei_name_casp",
+        "offer_countries",
+        "dti_ffg",
+        "dti_codes",
+        "white_paper_comments",
+    },
+    RegisterType.ART: COMMON_SORT_FIELDS | {
+        "authorisation_notification_date",
+        "credit_institution",
+        "white_paper_url",
+        "white_paper_offer_countries",
+        "authorisation_end_date",
+        "white_paper_notification_date",
+        "white_paper_comments",
+    },
+    RegisterType.EMT: COMMON_SORT_FIELDS | {
+        "authorisation_notification_date",
+        "authorisation_other_emt",
+        "exemption_48_4",
+        "exemption_48_5",
+        "white_paper_notification_date",
+        "white_paper_url",
+        "dti_ffg",
+        "dti_codes",
+        "authorisation_end_date",
+        "white_paper_comments",
+    },
+    RegisterType.NCASP: COMMON_SORT_FIELDS | {
+        "infringement",
+        "reason",
+        "decision_date",
+        "websites",
+    },
+}
+
+CASP_COMPANY_SORT_FIELDS = COMMON_SORT_FIELDS | {
+    "authorisation_notification_date",
+    "services",
+    "passport_countries",
+    "authorisation_end_date",
+    "website_platform",
+}
 
 
 def get_effective_home_member_state_expr():
@@ -259,6 +325,112 @@ def _normalize_lei(lei: Optional[str]) -> Optional[str]:
     return lei or None
 
 
+def _normalize_text_sort_value(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    return normalized or None
+
+
+def _normalize_url_sort_value(value: Optional[str]) -> Optional[str]:
+    normalized = _normalize_text_sort_value(value)
+    if not normalized:
+        return None
+    return normalized.removeprefix("https://").removeprefix("http://").removeprefix("www.")
+
+
+def _normalize_pipe_sort_value(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    parts = sorted(
+        part.strip().lower()
+        for part in value.split("|")
+        if part and part.strip()
+    )
+    if not parts:
+        return None
+    return "|".join(parts)
+
+
+def _normalize_sequence_sort_value(values: List[str]) -> Optional[str]:
+    parts = sorted(value.strip().lower() for value in values if value and value.strip())
+    if not parts:
+        return None
+    return "|".join(parts)
+
+
+def _normalize_bool_sort_value(value: Optional[bool]) -> Optional[int]:
+    if value is None:
+        return None
+    return 1 if value else 0
+
+
+def _normalize_reason_sort_value(value: Optional[str]) -> Optional[str]:
+    if value == "None":
+        return None
+    return _normalize_text_sort_value(value)
+
+
+def _effective_country_code(home_member_state: Optional[str], lei_cou_code: Optional[str]) -> Optional[str]:
+    return _normalize_text_sort_value(home_member_state or lei_cou_code)
+
+
+def _primary_display_name(commercial_name: Optional[str], lei_name: Optional[str]) -> Optional[str]:
+    return _normalize_text_sort_value(commercial_name or lei_name)
+
+
+def _compare_sort_values(left: Any, right: Any, descending: bool) -> int:
+    if left is None and right is None:
+        return 0
+    if left is None:
+        return 1
+    if right is None:
+        return -1
+
+    if left < right:
+        return -1 if not descending else 1
+    if left > right:
+        return 1 if not descending else -1
+    return 0
+
+
+def _compare_sorted_items(
+    left_item: Any,
+    right_item: Any,
+    left_value: Any,
+    right_value: Any,
+    descending: bool,
+) -> int:
+    comparison = _compare_sort_values(left_value, right_value, descending)
+    if comparison != 0:
+        return comparison
+
+    left_id = left_item.get("id") if isinstance(left_item, dict) else left_item.id
+    right_id = right_item.get("id") if isinstance(right_item, dict) else right_item.id
+    if left_id < right_id:
+        return -1
+    if left_id > right_id:
+        return 1
+    return 0
+
+
+def _parse_sort_params(sort_by: Optional[str], sort_dir: Optional[str], allowed_fields: set[str]) -> tuple[Optional[str], bool]:
+    if not sort_by:
+        return None, False
+
+    if sort_by not in allowed_fields:
+        raise HTTPException(status_code=400, detail=f"Unsupported sort field: {sort_by}")
+
+    if sort_dir is None:
+        return sort_by, False
+
+    normalized_sort_dir = sort_dir.lower()
+    if normalized_sort_dir not in {"asc", "desc"}:
+        raise HTTPException(status_code=400, detail=f"Unsupported sort direction: {sort_dir}")
+
+    return sort_by, normalized_sort_dir == "desc"
+
+
 def _casp_group_key(entity: Entity) -> str:
     return _normalize_lei(entity.lei) or f"entity:{entity.id}"
 
@@ -418,6 +590,135 @@ def _sort_casp_company_payloads(items: List[Dict[str, Any]]) -> List[Dict[str, A
     )
 
 
+def _get_entity_sort_value(entity: Entity, sort_by: str) -> Any:
+    if sort_by == "commercial_name":
+        return _primary_display_name(entity.commercial_name, entity.lei_name)
+    if sort_by == "home_member_state":
+        return _effective_country_code(entity.home_member_state, entity.lei_cou_code)
+    if sort_by == "website":
+        return _normalize_url_sort_value(entity.website)
+    if sort_by == "comments":
+        return _normalize_reason_sort_value(entity.comments)
+    if sort_by == "services":
+        return _normalize_sequence_sort_value([service.code for service in entity.services or []])
+    if sort_by == "passport_countries":
+        return _normalize_sequence_sort_value([
+            country.country_code for country in entity.passport_countries or []
+        ])
+    if sort_by == "white_paper_url":
+        return _normalize_url_sort_value(entity.white_paper_url)
+    if sort_by == "lei_casp":
+        return _primary_display_name(entity.lei_name_casp, entity.lei_casp)
+    if sort_by == "offer_countries":
+        return _normalize_pipe_sort_value(entity.offer_countries)
+    if sort_by == "dti_codes":
+        return _normalize_pipe_sort_value(entity.dti_codes)
+    if sort_by == "white_paper_comments":
+        return _normalize_reason_sort_value(entity.white_paper_comments)
+    if sort_by == "white_paper_offer_countries":
+        return _normalize_pipe_sort_value(entity.white_paper_offer_countries)
+    if sort_by == "authorisation_other_emt":
+        return _normalize_text_sort_value(entity.authorisation_other_emt)
+    if sort_by == "websites":
+        return _normalize_pipe_sort_value(entity.websites)
+    if sort_by == "reason":
+        return _normalize_reason_sort_value(entity.reason)
+    if sort_by in {"credit_institution", "exemption_48_4", "exemption_48_5"}:
+        return _normalize_bool_sort_value(getattr(entity, sort_by))
+    if sort_by in {
+        "lei_name",
+        "lei",
+        "lei_cou_code",
+        "competent_authority",
+        "address",
+        "last_update",
+        "authorisation_notification_date",
+        "authorisation_end_date",
+        "lei_name_casp",
+        "dti_ffg",
+        "white_paper_notification_date",
+        "infringement",
+        "decision_date",
+        "website_platform",
+    }:
+        value = getattr(entity, sort_by)
+        if isinstance(value, date):
+            return value
+        return _normalize_text_sort_value(value)
+
+    raise HTTPException(status_code=400, detail=f"Unsupported sort field: {sort_by}")
+
+
+def _get_casp_company_sort_value(item: Dict[str, Any], sort_by: str) -> Any:
+    if sort_by == "commercial_name":
+        return _primary_display_name(item.get("commercial_name"), item.get("lei_name"))
+    if sort_by == "home_member_state":
+        return _effective_country_code(item.get("home_member_state"), item.get("lei_cou_code"))
+    if sort_by == "website":
+        return _normalize_url_sort_value(item.get("website"))
+    if sort_by == "comments":
+        return _normalize_reason_sort_value(item.get("comments"))
+    if sort_by == "services":
+        return _normalize_sequence_sort_value([
+            service.get("code", "") for service in item.get("services") or []
+        ])
+    if sort_by == "passport_countries":
+        return _normalize_sequence_sort_value([
+            country.get("country_code", "") for country in item.get("passport_countries") or []
+        ])
+    if sort_by in {
+        "lei_name",
+        "lei",
+        "lei_cou_code",
+        "competent_authority",
+        "address",
+        "last_update",
+        "authorisation_notification_date",
+        "authorisation_end_date",
+        "website_platform",
+    }:
+        value = item.get(sort_by)
+        if isinstance(value, date):
+            return value
+        return _normalize_text_sort_value(value)
+
+    raise HTTPException(status_code=400, detail=f"Unsupported sort field: {sort_by}")
+
+
+def _sort_entities(items: List[Entity], sort_by: str, descending: bool) -> List[Entity]:
+    return sorted(
+        items,
+        key=cmp_to_key(
+            lambda left, right: _compare_sorted_items(
+                left,
+                right,
+                _get_entity_sort_value(left, sort_by),
+                _get_entity_sort_value(right, sort_by),
+                descending,
+            )
+        ),
+    )
+
+
+def _sort_casp_company_payloads_dynamic(
+    items: List[Dict[str, Any]],
+    sort_by: str,
+    descending: bool,
+) -> List[Dict[str, Any]]:
+    return sorted(
+        items,
+        key=cmp_to_key(
+            lambda left, right: _compare_sorted_items(
+                left,
+                right,
+                _get_casp_company_sort_value(left, sort_by),
+                _get_casp_company_sort_value(right, sort_by),
+                descending,
+            )
+        ),
+    )
+
+
 def _get_grouped_casp_companies(
     db: Session,
     home_member_states: Optional[List[str]] = None,
@@ -425,6 +726,8 @@ def _get_grouped_casp_companies(
     search: Optional[str] = None,
     auth_date_from: Optional[date] = None,
     auth_date_to: Optional[date] = None,
+    sort_by: Optional[str] = None,
+    descending: bool = False,
 ) -> List[Dict[str, Any]]:
     matching_rows = _apply_casp_row_filters(
         db.query(Entity).options(*ENTITY_EAGER_LOAD_OPTIONS).filter(Entity.register_type == RegisterType.CASP),
@@ -440,10 +743,14 @@ def _get_grouped_casp_companies(
 
     full_group_rows = _load_all_rows_for_casp_groups(db, matching_rows)
     grouped = _group_casp_entities(full_group_rows)
-    return _sort_casp_company_payloads([
+    companies = [
         _build_casp_company_payload(group_rows)
         for group_rows in grouped.values()
-    ])
+    ]
+
+    if sort_by:
+        return _sort_casp_company_payloads_dynamic(companies, sort_by, descending)
+    return _sort_casp_company_payloads(companies)
 
 
 @router.get("/entities", response_model=PaginatedResponse)
@@ -456,6 +763,8 @@ def get_entities(
     search: Optional[str] = None,
     auth_date_from: Optional[date] = None,
     auth_date_to: Optional[date] = None,
+    sort_by: Optional[str] = Query(None),
+    sort_dir: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """Get list of entities with filtering and pagination metadata
@@ -492,11 +801,21 @@ def get_entities(
     if auth_date_to:
         query = query.filter(Entity.authorisation_notification_date <= auth_date_to)
 
+    parsed_sort_by, descending = _parse_sort_params(
+        sort_by,
+        sort_dir,
+        REGISTER_SORT_FIELDS[register_type],
+    )
+
     # Get total count before pagination
     total = query.count()
 
-    # Apply pagination
-    entities = query.offset(skip).limit(limit).all()
+    if parsed_sort_by:
+        entities = _sort_entities(query.all(), parsed_sort_by, descending)
+        entities = entities[skip:skip + limit]
+    else:
+        # Preserve current default behavior when no explicit sort is requested.
+        entities = query.offset(skip).limit(limit).all()
 
     # Return paginated response with metadata
     return PaginatedResponse(
@@ -517,9 +836,16 @@ def get_casp_companies(
     search: Optional[str] = None,
     auth_date_from: Optional[date] = None,
     auth_date_to: Optional[date] = None,
+    sort_by: Optional[str] = Query(None),
+    sort_dir: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """Get grouped CASP companies with pagination metadata."""
+    parsed_sort_by, descending = _parse_sort_params(
+        sort_by,
+        sort_dir,
+        CASP_COMPANY_SORT_FIELDS,
+    )
     companies = _get_grouped_casp_companies(
         db,
         home_member_states=home_member_states,
@@ -527,6 +853,8 @@ def get_casp_companies(
         search=search,
         auth_date_from=auth_date_from,
         auth_date_to=auth_date_to,
+        sort_by=parsed_sort_by,
+        descending=descending,
     )
     total = len(companies)
     paginated_items = companies[skip:skip + limit]
@@ -1014,7 +1342,7 @@ def import_data(
     if not csv_path:
         raise HTTPException(
             status_code=404,
-            detail=f"CSV file not found. Checked data/cleaned/ directory for CASP *_clean.csv files and fallback locations."
+            detail="CSV file not found. Checked data/cleaned/ directory for CASP *_clean.csv files and fallback locations."
         )
 
     try:
@@ -1054,7 +1382,6 @@ def import_all_registers(
         dict: Import summary with counts per register
     """
     import logging
-    from pathlib import Path
     from ..import_csv import import_csv_to_db
     from ..models import RegisterType, Entity
     from ..utils.file_utils import get_latest_csv_for_register, get_base_data_dir

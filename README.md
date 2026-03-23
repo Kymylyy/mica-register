@@ -141,6 +141,27 @@ Operational behavior:
 - Feed responses include `ETag` and `Cache-Control` headers for conditional requests and client/proxy caching.
 - Feed endpoints are rate limited to 30 requests per 60 seconds per client IP.
 
+## List API Sorting
+
+List endpoints support single-column global sorting before pagination:
+
+- `GET /api/entities`
+- `GET /api/casp/companies`
+
+Query params:
+
+- `sort_by=<field>`
+- `sort_dir=asc|desc`
+
+Behavior:
+
+- Sorting is applied to the full filtered result set before `skip` and `limit`.
+- When `sort_by` is omitted, each endpoint keeps its existing default ordering.
+- Date fields always place `null` values at the end.
+- Unsupported sort fields return `400`.
+
+Supported `sort_by` values depend on the register and match the sortable columns exposed in the UI for that register.
+
 ## LLM Discovery
 
 - `GET /llms.txt` is served by the frontend domain (`https://www.micaregister.com/llms.txt`).
