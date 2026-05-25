@@ -8,7 +8,7 @@ Single command to:
 3. Validate CSVs
 4. Clean CSVs
 5. Import to database
-6. Update frontend date
+6. Persist ESMA update metadata for API/frontend display
 7. Generate summary report
 
 Usage:
@@ -313,8 +313,12 @@ def import_to_db(
             return True, entity_counts
         else:
             print(f"  ❌ Database import failed (exit code: {result.returncode})")
+            if result.stdout:
+                print("----- import stdout -----")
+                print(result.stdout)
             if result.stderr:
-                print(f"     Error: {result.stderr[:200]}")
+                print("----- import stderr -----")
+                print(result.stderr)
             return False, {}
 
     except Exception as e:
@@ -605,7 +609,7 @@ def print_summary(
         print("  1. Review the changes above")
         print("  2. Test the application locally")
         print("  3. Commit the changes:")
-        print(f"     git add data/ frontend/src/App.jsx")
+        print(f"     git add data/")
         print(f"     git commit -m \"Update ESMA data to {datetime.now().strftime('%d %B %Y')}\"")
         print("  4. Push to remote and deploy")
         print()
@@ -816,16 +820,14 @@ def main():
             dry_run=args.dry_run
         )
 
-    # Update frontend date (if any succeeded)
+    # The frontend displays last-updated dates from /api/metadata/last-updated.
+    # Railway's backend image intentionally does not include frontend sources,
+    # so mutating frontend/src/App.jsx here is obsolete and noisy in production.
     if successful_results and not args.dry_run:
         print(f"\n{'='*60}")
-        print("Step 6: Updating frontend date")
+        print("Step 6: Frontend date update")
         print(f"{'='*60}")
-
-        if esma_date:
-            update_frontend_date(esma_date, dry_run=args.dry_run)
-        else:
-            print("⚠️  Warning: Could not determine ESMA update date, skipping frontend update")
+        print("Frontend date is served from API metadata; no source file update needed.")
 
     # Print summary
     print_summary(results, entity_counts, dry_run=args.dry_run)

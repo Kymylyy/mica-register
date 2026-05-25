@@ -3,6 +3,7 @@
 import importlib.util
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def load_update_script():
@@ -80,6 +81,76 @@ def test_no_use_clean_llm_flag_is_passed_to_db_import(monkeypatch):
 
     assert exit_code == module.EXIT_SUCCESS
     assert import_args["prefer_llm"] is False
+
+
+def test_db_import_failure_prints_full_subprocess_output(monkeypatch, capsys):
+    module = load_update_script()
+    long_stderr = "database error: " + ("x" * 240) + " constraint_tail"
+
+    def fake_run(cmd, capture_output, text, timeout):
+        assert "import_all_registers.py" in str(cmd[1])
+        assert capture_output is True
+        assert text is True
+        assert timeout == 300
+        return SimpleNamespace(
+            returncode=1,
+            stdout="import stdout details",
+            stderr=long_stderr,
+        )
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    success, entity_counts = module.import_to_db()
+
+    output = capsys.readouterr().out
+    assert success is False
+    assert entity_counts == {}
+    assert "import stdout details" in output
+    assert "constraint_tail" in output
+
+
+def test_frontend_source_update_is_skipped_for_metadata_flow(monkeypatch):
+    module = load_update_script()
+
+    monkeypatch.setattr(module, "get_esma_update_date", lambda: date(2026, 2, 8))
+    monkeypatch.setattr(module, "ensure_directory_structure", lambda: None)
+    monkeypatch.setattr(module, "save_report", lambda *args, **kwargs: None)
+
+    frontend_update_calls = {"count": 0}
+
+    def fake_update_frontend_date(*args, **kwargs):
+        frontend_update_calls["count"] += 1
+        return True
+
+    def fake_update_register(register_type, **kwargs):
+        result = module.UpdateResult(register_type=register_type)
+        result.success = True
+        return result
+
+    monkeypatch.setattr(module, "update_frontend_date", fake_update_frontend_date)
+    monkeypatch.setattr(module, "update_register", fake_update_register)
+    monkeypatch.setattr(
+        module,
+        "import_to_db",
+        lambda **kwargs: (True, {module.RegisterType.CASP: 1})
+    )
+    monkeypatch.setattr(module, "save_esma_update_metadata", lambda **kwargs: True)
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        [
+            "update_all_registers.py",
+            "--registers",
+            "casp",
+            "--report",
+            "/tmp/test_update_report.json",
+        ],
+    )
+
+    exit_code = module.main()
+
+    assert exit_code == module.EXIT_SUCCESS
+    assert frontend_update_calls["count"] == 0
 
 
 def test_esma_metadata_is_saved_after_successful_import(monkeypatch):
