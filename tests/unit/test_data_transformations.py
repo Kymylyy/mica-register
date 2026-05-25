@@ -6,7 +6,7 @@ Tests parsing of dates, booleans, pipe-separated values, service codes, etc.
 
 import pytest
 from datetime import date
-from backend.app.import_csv import parse_date, normalize_service_code
+from backend.app.import_csv import parse_date, normalize_country_code, normalize_service_code
 from backend.app.config.registers import parse_yes_no
 
 
@@ -134,6 +134,22 @@ class TestServiceCodeNormalization:
         """Test uppercase 'A' returns 'a' (lowercase)"""
         result = normalize_service_code("A")
         assert result == "a"
+
+
+class TestCountryCodeNormalization:
+    """Test normalize_country_code() for ESMA country fields"""
+
+    def test_keeps_two_letter_code(self):
+        assert normalize_country_code("FR") == "FR"
+
+    def test_keeps_three_letter_code(self):
+        assert normalize_country_code("BVI") == "BVI"
+
+    def test_extracts_code_from_country_label(self):
+        assert normalize_country_code("FRANCE - FR") == "FR"
+
+    def test_empty_value_returns_none(self):
+        assert normalize_country_code("") is None
 
 
 class TestPipeSeparatedParsing:

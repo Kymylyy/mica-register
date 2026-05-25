@@ -70,6 +70,23 @@ def parse_pipe_separated(value: Optional[str]) -> List[str]:
     return [item.strip() for item in str(value).split("|") if item.strip()]
 
 
+def normalize_country_code(value: Optional[str]) -> Optional[str]:
+    """Normalize ESMA country fields to compact country codes."""
+    if not value or pd.isna(value):
+        return None
+
+    country_text = str(value).strip()
+    if not country_text:
+        return None
+
+    import re
+    match = re.search(r'(?:^|[-\s])([A-Z]{2,3})$', country_text.upper())
+    if match:
+        return match.group(1)
+
+    return country_text
+
+
 def normalize_service_code(service_text: str) -> Optional[str]:
     """
     Normalize service code from CSV to standard MiCA code (a-j).
@@ -394,7 +411,7 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
         home_member_state = str(row.get('ae_homeMemberState', '')).strip() if not pd.isna(row.get('ae_homeMemberState')) else None
         lei_name = str(row.get('ae_lei_name', '')).strip() if not pd.isna(row.get('ae_lei_name')) else None
         lei = str(row.get('ae_lei', '')).strip() if not pd.isna(row.get('ae_lei')) else None
-        lei_cou_code = str(row.get('ae_lei_cou_code', '')).strip() if not pd.isna(row.get('ae_lei_cou_code')) else None
+        lei_cou_code = normalize_country_code(row.get('ae_lei_cou_code'))
 
         # Commercial name (optional in some registers like OTHER)
         commercial_name = str(row.get('ae_commercial_name', '')).strip() if not pd.isna(row.get('ae_commercial_name')) else None
