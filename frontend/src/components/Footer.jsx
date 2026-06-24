@@ -4,12 +4,21 @@ const Footer = () => {
 
   return (
     <footer className="mt-auto border-t border-slate-200 bg-slate-50/50">
-      <div className="max-w-[1400px] mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-slate-600">
-            © 2026 MiCA Registers
-          </div>
-          <div className="flex items-center gap-3">
+      <div className="max-w-[1400px] mx-auto px-6 py-3 flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between">
+        <div className="text-sm text-slate-600">
+          Built &amp; maintained by{' '}
+          <a
+            href="https://www.linkedin.com/in/kamilmoson/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-slate-700 hover:text-slate-900 hover:underline transition-colors"
+          >
+            Kamil Mosoń
+          </a>
+          <span className="text-slate-400"> · </span>
+          <span className="text-slate-500">Independent tool, not affiliated with ESMA or the EU</span>
+        </div>
+        <div className="flex items-center gap-3">
             <ContactPill
               href="mailto:kamil.marek.moson@gmail.com"
               icon={
@@ -29,7 +38,6 @@ const Footer = () => {
               text="kamilmoson"
             />
           </div>
-        </div>
       </div>
     </footer>
   );

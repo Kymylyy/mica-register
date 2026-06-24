@@ -7,7 +7,7 @@ import { DataTable } from './components/DataTable';
 import { Filters } from './components/Filters';
 import { RegisterSelector } from './components/RegisterSelector';
 import { FlagIcon } from './components/FlagIcon';
-import { ContactPill } from './components/ContactPill';
+import Footer from './components/Footer';
 import { formatDate, copyToClipboard } from './utils/modalUtils';
 import { getServiceCodeOrder, getServiceMediumName } from './utils/serviceDescriptions';
 import { useDebounce } from './utils/debounce';
@@ -475,40 +475,36 @@ function App({ registerType = 'casp' }) {
                   MiCA Registers
                 </h1>
                 <p className="text-sm text-slate-600">
-                  ESMA registers{' '}
+                  Data sourced from{' '}
                   <a
                     href="https://www.esma.europa.eu/esmas-activities/digital-finance-and-innovation/markets-crypto-assets-regulation-mica#InterimMiCARegister"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sky-600 hover:text-sky-700 hover:underline transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1 rounded-sm font-medium"
                   >
-                    available here
+                    ESMA&apos;s official MiCA registers
                   </a>
                   {' '}• Last updated: {formatHeaderDate(lastUpdated)}
                 </p>
               </div>
 
-              {/* Right: Contact Pills */}
-              <div className="flex items-center gap-2">
-                <ContactPill
-                  href="mailto:kamil.marek.moson@gmail.com"
-                  icon={
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  }
-                  text="kamil.marek.moson@gmail.com"
-                />
-                <ContactPill
-                  href="https://www.linkedin.com/in/kamilmoson/"
-                  icon={
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                    </svg>
-                  }
-                  text="Kamil Mosoń"
-                />
-              </div>
+              {/* Right: Compliance CTA */}
+              <a
+                href="https://www.linkedin.com/in/kamilmoson/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex flex-col rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 md:text-right focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+              >
+                <span className="text-sm font-medium text-slate-700 leading-snug whitespace-nowrap">
+                  What if being compliant is the cheapest thing you'll ever buy?
+                </span>
+                <span className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 group-hover:text-blue-800 md:self-end">
+                  CASP licensing &amp; MiCA advisory
+                  <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </span>
+              </a>
           </div>
           </div>
         </header>
@@ -1231,6 +1227,7 @@ function App({ registerType = 'casp' }) {
         )}
         </div>
       </div>
+      <Footer />
       <Analytics />
     </div>
   );
