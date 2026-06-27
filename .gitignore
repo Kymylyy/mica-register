@@ -57,6 +57,9 @@ reports/
 
 
 
+# Feature working data (EBA PSP register, etc.) — local only, not committed
+feat-data/
+
 # Test coverage
 htmlcov/
 .coverage
