@@ -7,7 +7,7 @@ pydantic>=2.7.0
 psycopg2-binary==2.9.11
 
 # Optional dependencies for CSV validation (graceful degradation if not installed)
-pycountry>=23.0.0
+pycountry>=23.12.11
 charset-normalizer>=3.0.0
 
 # Testing
