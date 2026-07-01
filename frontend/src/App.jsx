@@ -496,7 +496,7 @@ function App({ registerType = 'casp' }) {
                 className="group flex flex-col rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 md:text-right focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
               >
                 <span className="text-sm font-medium text-slate-700 leading-snug whitespace-nowrap">
-                  What if being compliant is the cheapest thing you'll ever buy?
+                  Not on ESMA&apos;s register yet? Let&apos;s fix that.
                 </span>
                 <span className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 group-hover:text-blue-800 md:self-end">
                   CASP licensing &amp; MiCA advisory
