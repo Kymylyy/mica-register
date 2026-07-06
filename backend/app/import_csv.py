@@ -1,4 +1,5 @@
 import pandas as pd
+import re
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -152,8 +153,10 @@ def fix_encoding_issues(text):
         return text
     
     # Fix replacement character (U+FFFD = \ufffd) in context of German words
-    # The replacement character can appear as different representations
-    replacement_chars = ['\ufffd', '\xef\xbf\xbd', '']
+    # The replacement character can appear as different representations.
+    # Only actual replacement characters are handled here \u2014 applying these fixes
+    # without a corruption marker would mangle legitimate text.
+    replacement_chars = ['\ufffd', '\xef\xbf\xbd']
     
     for rep_char in replacement_chars:
         # Fix "Stra" + replacement + "e" -> "Straße"
@@ -174,16 +177,12 @@ def fix_encoding_issues(text):
         if 'M' + rep_char + 'n' in text and ('chen' in text or 'ster' in text):
             text = text.replace('M' + rep_char + 'n', 'Mün')
     
-    # Fix "Strae" (without replacement char, just missing ß)
-    text = text.replace('Strae', 'Straße')
-    text = text.replace('strae', 'straße')
-    
-    # Fix "Lw" -> "Löw" (without replacement char)
-    text = text.replace('Lw', 'Löw')
-    text = text.replace('lw', 'löw')
-    
-    # Fix other common patterns where ß was lost
-    text = text.replace('Strasse', 'Straße')  # Alternative spelling
+    # Fix "Strae" (without replacement char, just missing ß).
+    # Word-end boundary only: matches "Musterstrae"/"Strae" but not e.g. the
+    # city "Straelen". No global "lw"->"löw" or "Strasse"->"Straße" here —
+    # those substrings occur in legitimate names and addresses.
+    text = re.sub(r'Strae\b', 'Straße', text)
+    text = re.sub(r'strae\b', 'straße', text)
     
     # Fix common German umlauts (only fix broken encodings, not already correct ones)
     # These are common mis-encodings from UTF-8 read as Latin-1
@@ -197,7 +196,6 @@ def fix_encoding_issues(text):
     
     # Fix broken quotation marks (replacement character in quotes context)
     # Pattern: (replacement char)Text(replacement char) -> "Text"
-    import re
     for rep_char in replacement_chars:
         if rep_char:  # Only process if replacement char is not empty
             # Fix pattern like (Kraken) -> ("Kraken")
@@ -383,8 +381,9 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
     db.execute(text(f"DELETE FROM entity_tags WHERE entity_id IN (SELECT id FROM entities WHERE register_type = '{register_type_value}')"))
 
     # Delete entities for this register type (use raw SQL to avoid SQLAlchemy Enum name/value mismatch)
+    # NOTE: no commit here — delete and insert must be one transaction, so a failed
+    # import rolls back to the previous data instead of leaving the register empty.
     db.execute(text(f"DELETE FROM entities WHERE register_type = '{register_type_value}'"))
-    db.commit()
 
     # Caches to avoid duplicate objects in same session (CASP only)
     service_cache = {}
