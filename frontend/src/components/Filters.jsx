@@ -742,12 +742,7 @@ export function Filters({ registerType = 'casp', filters, onFiltersChange, onCle
                 
                 {(filters.auth_date_from || filters.auth_date_to) && (
                   <button
-                    onClick={() => {
-                      setAuthDateFromInput('');
-                      setAuthDateToInput('');
-                      handleChange('auth_date_from', null);
-                      handleChange('auth_date_to', null);
-                    }}
+                    onClick={handleRemoveDateFilter}
                     className="mt-3 text-xs text-primary hover:underline"
                   >
                     Clear dates
