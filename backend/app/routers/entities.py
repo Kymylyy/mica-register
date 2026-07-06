@@ -431,6 +431,31 @@ def _parse_sort_params(sort_by: Optional[str], sort_dir: Optional[str], allowed_
     return sort_by, normalized_sort_dir == "desc"
 
 
+def _sql_text_sort_expr(column):
+    """SQL equivalent of _normalize_text_sort_value (strip + lower, empty -> NULL)."""
+    return func.nullif(func.lower(func.trim(column)), "")
+
+
+# Sort fields backed by plain columns on the entities table, expressed in SQL so
+# sorting can paginate in the database instead of loading the whole register.
+# Fields backed by extension tables or aggregates still go through _sort_entities().
+SQL_SORT_EXPRESSIONS = {
+    "commercial_name": _sql_text_sort_expr(
+        func.coalesce(func.nullif(Entity.commercial_name, ""), Entity.lei_name)
+    ),
+    "home_member_state": _sql_text_sort_expr(
+        func.coalesce(func.nullif(Entity.home_member_state, ""), Entity.lei_cou_code)
+    ),
+    "lei_name": _sql_text_sort_expr(Entity.lei_name),
+    "lei": _sql_text_sort_expr(Entity.lei),
+    "lei_cou_code": _sql_text_sort_expr(Entity.lei_cou_code),
+    "competent_authority": _sql_text_sort_expr(Entity.competent_authority),
+    "address": _sql_text_sort_expr(Entity.address),
+    "last_update": Entity.last_update,
+    "authorisation_notification_date": Entity.authorisation_notification_date,
+}
+
+
 def _casp_group_key(entity: Entity) -> str:
     return _normalize_lei(entity.lei) or f"entity:{entity.id}"
 
@@ -810,7 +835,19 @@ def get_entities(
     # Get total count before pagination
     total = query.count()
 
-    if parsed_sort_by:
+    sql_sort_expr = SQL_SORT_EXPRESSIONS.get(parsed_sort_by) if parsed_sort_by else None
+    if sql_sort_expr is not None:
+        # Sort and paginate in the database (NULLs last in both directions,
+        # id as tie-break) instead of loading the whole register into memory.
+        order = sql_sort_expr.desc() if descending else sql_sort_expr.asc()
+        entities = (
+            query.order_by(order.nulls_last(), Entity.id.asc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+    elif parsed_sort_by:
+        # Fields backed by extension tables or aggregates: sort in Python.
         entities = _sort_entities(query.all(), parsed_sort_by, descending)
         entities = entities[skip:skip + limit]
     else:
