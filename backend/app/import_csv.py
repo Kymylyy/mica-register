@@ -13,11 +13,17 @@ from .config.registers import (
     get_register_config, RegisterConfig,
     parse_yes_no, parse_true_false
 )
-from .config.constants import MICA_SERVICE_DESCRIPTIONS
+from .config.constants import MICA_SERVICE_DESCRIPTIONS, COUNTRY_NAMES
 from typing import List, Optional
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+# Reverse lookup for country names published instead of codes.
+# First code wins, so 'Greece' maps to 'GR' rather than the alternative 'EL'.
+COUNTRY_CODES_BY_NAME: dict = {}
+for _code, _name in COUNTRY_NAMES.items():
+    COUNTRY_CODES_BY_NAME.setdefault(_name.upper(), _code)
 
 
 def parse_date(date_str: Optional[str], date_format: str = "%d/%m/%Y") -> Optional[datetime]:
@@ -86,6 +92,31 @@ def normalize_country_code(value: Optional[str]) -> Optional[str]:
         return match.group(1)
 
     return country_text
+
+
+def normalize_member_state(value: Optional[str]) -> Optional[str]:
+    """Normalize ESMA home member state to a 2-letter country code.
+
+    ESMA occasionally publishes a full country name (e.g. 'Austria') where a
+    code is expected. The column is VARCHAR(2), so an un-normalized value
+    aborts the import of the whole register.
+    """
+    if value is None or pd.isna(value):
+        return None
+
+    member_state = str(value).strip()
+    if not member_state:
+        return None
+
+    if len(member_state) == 2:
+        return member_state
+
+    code = COUNTRY_CODES_BY_NAME.get(member_state.upper())
+    if code:
+        return code
+
+    print(f"⚠ Unrecognized home member state '{member_state}', storing as empty")
+    return None
 
 
 def normalize_service_code(service_text: str) -> Optional[str]:
@@ -407,7 +438,7 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
 
         # === Parse common fields (all registers) ===
         competent_authority = str(row.get('ae_competentAuthority', '')).strip() if not pd.isna(row.get('ae_competentAuthority')) else None
-        home_member_state = str(row.get('ae_homeMemberState', '')).strip() if not pd.isna(row.get('ae_homeMemberState')) else None
+        home_member_state = normalize_member_state(row.get('ae_homeMemberState'))
         lei_name = str(row.get('ae_lei_name', '')).strip() if not pd.isna(row.get('ae_lei_name')) else None
         lei = str(row.get('ae_lei', '')).strip() if not pd.isna(row.get('ae_lei')) else None
         lei_cou_code = normalize_country_code(row.get('ae_lei_cou_code'))

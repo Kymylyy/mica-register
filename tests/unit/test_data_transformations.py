@@ -6,7 +6,9 @@ Tests parsing of dates, booleans, pipe-separated values, service codes, etc.
 
 import pytest
 from datetime import date
-from backend.app.import_csv import parse_date, normalize_country_code, normalize_service_code
+from backend.app.import_csv import (
+    parse_date, normalize_country_code, normalize_member_state, normalize_service_code
+)
 from backend.app.config.registers import parse_yes_no
 
 
@@ -150,6 +152,27 @@ class TestCountryCodeNormalization:
 
     def test_empty_value_returns_none(self):
         assert normalize_country_code("") is None
+
+
+class TestMemberStateNormalization:
+    """Test normalize_member_state() for ESMA ae_homeMemberState field"""
+
+    def test_keeps_two_letter_code(self):
+        assert normalize_member_state("AT") == "AT"
+
+    def test_maps_full_country_name_to_code(self):
+        """ESMA published 'Austria' instead of 'AT' on 11/08/2026"""
+        assert normalize_member_state("Austria") == "AT"
+
+    def test_maps_name_case_insensitively(self):
+        assert normalize_member_state("CZECH REPUBLIC") == "CZ"
+
+    def test_unknown_value_returns_none(self):
+        assert normalize_member_state("Atlantis") is None
+
+    def test_empty_value_returns_none(self):
+        assert normalize_member_state("") is None
+        assert normalize_member_state(None) is None
 
 
 class TestPipeSeparatedParsing:
