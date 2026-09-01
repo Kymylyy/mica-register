@@ -341,16 +341,23 @@ function App({ registerType = 'casp' }) {
     ? getPrimaryCountryCode(selectedEntity.home_member_state, selectedEntity.lei_cou_code)
     : null;
 
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
+  // Render-phase adjustments instead of effects (react.dev: "You Might Not
+  // Need an Effect") — avoids react-hooks/set-state-in-effect warnings
+  if (currentPage > totalPages) {
+    setCurrentPage(totalPages);
+  }
+
+  const [prevEntityIdParam, setPrevEntityIdParam] = useState(entityIdParam);
+  if (prevEntityIdParam !== entityIdParam) {
+    setPrevEntityIdParam(entityIdParam);
+    if (!entityIdParam && selectedEntity) {
+      setSelectedEntity(null);
     }
-  }, [currentPage, totalPages]);
+  }
 
   // Sync entity modal with URL route (/register/:entityId)
   useEffect(() => {
     if (!entityIdParam) {
-      setSelectedEntity(null);
       return;
     }
 
