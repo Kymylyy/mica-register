@@ -14,6 +14,7 @@ from .config.registers import (
     parse_yes_no, parse_true_false
 )
 from .config.constants import MICA_SERVICE_DESCRIPTIONS, COUNTRY_NAMES
+from .slugs import assign_slugs, compute_identity_key
 from typing import List, Optional
 
 # Initialize logger
@@ -420,6 +421,9 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
     service_cache = {}
     country_cache = {}
 
+    # Collected (entity, identity_key, display_name, country) for slug assignment
+    pending_slugs = []
+
     # Import rows
     imported_count = 0
     for index, row in df.iterrows():
@@ -482,6 +486,10 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
         )
         db.add(entity)
         db.flush()  # Get entity.id for extension table
+
+        # Register-specific inputs for the slug identity key (set in branches below)
+        identity_wp_url = None
+        identity_websites = None
 
         # === Create register-specific extension ===
         if register_type == RegisterType.CASP:
@@ -557,6 +565,7 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
                 lei_name_casp=lei_name_casp
             )
             db.add(other_entity)
+            identity_wp_url = white_paper_url
 
         elif register_type == RegisterType.ART:
             # ART-specific fields
@@ -580,6 +589,7 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
                 white_paper_last_update=white_paper_last_update
             )
             db.add(art_entity)
+            identity_wp_url = white_paper_url
 
         elif register_type == RegisterType.EMT:
             # EMT-specific fields
@@ -610,6 +620,7 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
                 white_paper_last_update=white_paper_last_update
             )
             db.add(emt_entity)
+            identity_wp_url = white_paper_url
 
         elif register_type == RegisterType.NCASP:
             # NCASP-specific fields
@@ -627,8 +638,23 @@ def import_csv_to_db(db: Session, csv_path: str, register_type: RegisterType = R
                 decision_date=decision_date
             )
             db.add(ncasp_entity)
+            identity_websites = websites
+
+        identity_key = compute_identity_key(
+            register_type_value,
+            lei=lei,
+            lei_name=lei_name,
+            home_member_state=home_member_state,
+            white_paper_url=identity_wp_url,
+            websites=identity_websites,
+        )
+        display_name = commercial_name or lei_name
+        pending_slugs.append((entity, identity_key, display_name, home_member_state))
 
         imported_count += 1
+
+    # Assign stable slugs (reuses the persistent entity_slugs registry)
+    assign_slugs(db, register_type_value, pending_slugs)
 
     # Commit everything at once
     db.commit()

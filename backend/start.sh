@@ -26,6 +26,14 @@ if [ $? -ne 0 ]; then
 fi
 echo ""
 
+echo "Running migration 003: Entity slugs..."
+python migrations/003_add_entity_slugs.py
+if [ $? -ne 0 ]; then
+    echo "[ERROR] Migration 003 failed!"
+    exit 1
+fi
+echo ""
+
 echo "[OK] All migrations completed successfully"
 echo ""
 

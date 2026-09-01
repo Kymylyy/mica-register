@@ -61,6 +61,9 @@ class EntityBase(BaseModel):
     lei: Optional[str] = None
     lei_cou_code: Optional[str] = None
 
+    # Stable URL slug (shared by CASP rows of the same LEI)
+    slug: Optional[str] = None
+
     # Fields present in most registers (nullable)
     commercial_name: Optional[str] = None
     address: Optional[str] = None
@@ -164,6 +167,7 @@ class CaspAuthorisationRecord(BaseModel):
 
 class CaspCompanySummary(BaseModel):
     id: int
+    slug: Optional[str] = None
     register_type: RegisterTypeEnum = RegisterTypeEnum.CASP
     competent_authority: Optional[str] = None
     home_member_state: Optional[str] = None

@@ -18,8 +18,8 @@ const SITE_URL = 'https://www.micaregister.com';
 
 const REGISTER_PAGE_META = {
   casp: {
-    title: 'MiCA CASP Register | EU Crypto-Asset Service Providers',
-    description: 'Search the MiCA CASP register of EU crypto-asset service providers by LEI, country, services, and authorization date.',
+    title: 'MiCA CASP Register | ESMA-Listed Crypto-Asset Service Providers',
+    description: 'Searchable ESMA CASP register: every MiCA-authorised crypto-asset service provider in the EU. Filter by country, services, LEI, and authorisation date — updated with each ESMA publication.',
     label: 'CASP',
   },
   other: {
@@ -117,11 +117,19 @@ function getListEndpoint(registerType, params) {
   return `/api/entities?${params.toString()}`;
 }
 
-function getDetailEndpoint(registerType, entityId) {
+function isNumericId(value) {
+  return /^\d+$/.test(String(value ?? ''));
+}
+
+function getDetailEndpoint(registerType, entityKey) {
   if (registerType === 'casp') {
-    return `/api/casp/companies/${entityId}`;
+    return isNumericId(entityKey)
+      ? `/api/casp/companies/${entityKey}`
+      : `/api/casp/companies/by-slug/${encodeURIComponent(entityKey)}`;
   }
-  return `/api/entities/${entityId}`;
+  return isNumericId(entityKey)
+    ? `/api/entities/${entityKey}`
+    : `/api/entities/by-slug/${encodeURIComponent(entityKey)}?register_type=${registerType}`;
 }
 
 function hasGroupedAuthorisationRecords(entity) {
@@ -155,7 +163,8 @@ function App({ registerType = 'casp' }) {
   const isInitialMount = useRef(true);
   const abortControllerRef = useRef(null);
   const registerBasePath = `/${registerType}`;
-  const buildEntityPath = useCallback((entityId) => `${registerBasePath}/${entityId}`, [registerBasePath]);
+  // Prefer the stable slug in URLs; numeric id is the legacy fallback
+  const buildEntityPath = useCallback((entity) => `${registerBasePath}/${entity?.slug || entity?.id || entity}`, [registerBasePath]);
 
   // Debounce search input (300ms) for better performance
   const debouncedSearch = useDebounce(filters.search, 300);
@@ -317,7 +326,7 @@ function App({ registerType = 'casp' }) {
 
   const handleRowClick = useCallback((entity) => {
     setSelectedEntity(entity);
-    navigate(buildEntityPath(entity.id));
+    navigate(buildEntityPath(entity));
   }, [navigate, buildEntityPath]);
 
   const handleCloseDetails = useCallback(() => {
@@ -345,28 +354,30 @@ function App({ registerType = 'casp' }) {
       return;
     }
 
-    const parsedEntityId = Number.parseInt(entityIdParam, 10);
-    if (!Number.isInteger(parsedEntityId) || parsedEntityId <= 0) {
+    if (isNumericId(entityIdParam) && Number.parseInt(entityIdParam, 10) <= 0) {
       navigate(registerBasePath, { replace: true });
       return;
     }
 
     let cancelled = false;
 
-    api.get(getDetailEndpoint(registerType, parsedEntityId))
+    api.get(getDetailEndpoint(registerType, entityIdParam))
       .then((response) => {
         if (cancelled) return;
 
         const entity = response.data;
 
-        if (registerType === 'casp' && entity?.id && entity.id !== parsedEntityId) {
-          navigate(buildEntityPath(entity.id), { replace: true });
-        }
-
         // Keep URL and content coherent if entity belongs to another register
         if (entity?.register_type && entity.register_type !== registerType) {
-          navigate(`/${entity.register_type}/${entity.id}`, { replace: true });
+          navigate(`/${entity.register_type}/${entity.slug || entity.id}`, { replace: true });
           return;
+        }
+
+        // Canonicalize the URL to the stable slug (covers legacy numeric ids
+        // and raw CASP row ids resolving to their grouped company)
+        const canonicalKey = entity?.slug || entity?.id;
+        if (canonicalKey && String(canonicalKey) !== entityIdParam) {
+          navigate(`${registerBasePath}/${canonicalKey}`, { replace: true });
         }
 
         setSelectedEntity(entity);
@@ -394,15 +405,13 @@ function App({ registerType = 'casp' }) {
     return () => {
       cancelled = true;
     };
-  }, [entityIdParam, registerType, navigate, registerBasePath, buildEntityPath]);
+  }, [entityIdParam, registerType, navigate, registerBasePath]);
 
   // Update document SEO metadata for register list pages and entity detail routes
   useEffect(() => {
     const registerMeta = REGISTER_PAGE_META[registerType] || REGISTER_PAGE_META.casp;
-    const parsedEntityId = entityIdParam ? Number.parseInt(entityIdParam, 10) : null;
-    const hasEntityRoute = Number.isInteger(parsedEntityId) && parsedEntityId > 0;
 
-    if (!hasEntityRoute) {
+    if (!entityIdParam) {
       updateSeoMeta({
         title: registerMeta.title,
         description: registerMeta.description,
@@ -411,14 +420,14 @@ function App({ registerType = 'casp' }) {
       return;
     }
 
-    const entityName = selectedEntity?.commercial_name?.trim() || selectedEntity?.lei_name?.trim() || `Entity ${parsedEntityId}`;
+    const entityName = selectedEntity?.commercial_name?.trim() || selectedEntity?.lei_name?.trim() || `Entity ${entityIdParam}`;
     const title = `${entityName} | MiCA ${registerMeta.label} Register`;
     const description = `Entity details for ${entityName} in the MiCA ${registerMeta.label} register, including jurisdiction and register-specific fields.`;
 
     updateSeoMeta({
       title,
       description,
-      canonicalPath: `${registerBasePath}/${parsedEntityId}`,
+      canonicalPath: `${registerBasePath}/${selectedEntity?.slug || entityIdParam}`,
     });
   }, [registerType, registerBasePath, entityIdParam, selectedEntity]);
 
@@ -443,7 +452,7 @@ function App({ registerType = 'casp' }) {
 
         const nextEntity = entities[newIndex];
         setSelectedEntity(nextEntity);
-        navigate(buildEntityPath(nextEntity.id), { replace: true });
+        navigate(buildEntityPath(nextEntity), { replace: true });
       }
     };
 
@@ -560,7 +569,7 @@ function App({ registerType = 'casp' }) {
                 registerType={registerType}
                 sorting={sorting}
                 onSortingChange={handleSortingChange}
-                getEntityHref={(entity) => buildEntityPath(entity.id)}
+                getEntityHref={(entity) => buildEntityPath(entity)}
               />
               <div className="mt-4 mb-2 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-gray-600">

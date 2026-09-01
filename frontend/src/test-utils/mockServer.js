@@ -135,12 +135,37 @@ export const handlers = [
     );
   }),
 
+  // GET /api/entities/by-slug/:slug - Get single entity by stable slug
+  http.get(`${API_BASE}/api/entities/by-slug/:slug`, ({ params, request }) => {
+    const { slug } = params;
+    const registerType = new URL(request.url).searchParams.get('register_type') || 'casp';
+    const entity = getMockEntities(registerType).find(e => e.slug === slug);
+
+    if (entity) {
+      return HttpResponse.json(entity);
+    }
+
+    return new HttpResponse(null, { status: 404 });
+  }),
+
   // GET /api/entities/:id - Get single entity
   http.get(`${API_BASE}/api/entities/:id`, ({ params }) => {
     const { id } = params;
     // For testing, just return CASP entity
     const entities = getMockEntities('casp');
     const entity = entities.find(e => e.id === parseInt(id, 10));
+
+    if (entity) {
+      return HttpResponse.json(entity);
+    }
+
+    return new HttpResponse(null, { status: 404 });
+  }),
+
+  // GET /api/casp/companies/by-slug/:slug - Get grouped CASP company by slug
+  http.get(`${API_BASE}/api/casp/companies/by-slug/:slug`, ({ params }) => {
+    const { slug } = params;
+    const entity = getMockEntities('casp').find(e => e.slug === slug);
 
     if (entity) {
       return HttpResponse.json(entity);
