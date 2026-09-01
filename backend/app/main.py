@@ -20,6 +20,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Access log for API consumers: uvicorn only shows Railway's proxy IP, so log
+# the real client (X-Forwarded-For), user agent and origin for /api/* and /docs.
+# Requests without an origin/referer from our frontend are external consumers.
+@app.middleware("http")
+async def log_api_access(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/api/") or path == "/docs":
+        forwarded = request.headers.get("x-forwarded-for")
+        client_ip = (forwarded or (request.client.host if request.client else "-")).split(",")[0].strip()
+        user_agent = (request.headers.get("user-agent") or "-")[:150]
+        origin = request.headers.get("origin") or request.headers.get("referer") or "-"
+        query = f"?{request.url.query}" if request.url.query else ""
+        print(
+            f'ACCESS {response.status_code} {request.method} {path}{query} '
+            f'ip={client_ip} origin={origin} ua="{user_agent}"',
+            flush=True,
+        )
+    return response
+
+
 # Include routers
 app.include_router(entities.router, prefix="/api", tags=["entities"])
 app.include_router(feeds.router, prefix="/api", tags=["feeds"])
