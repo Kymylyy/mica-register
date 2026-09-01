@@ -41,6 +41,7 @@ ENTITY_EAGER_LOAD_OPTIONS = [
 
 CSV_COLUMNS = [
     "id",
+    "slug",
     "register_type",
     "competent_authority",
     "home_member_state",

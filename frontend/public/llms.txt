@@ -22,7 +22,9 @@ Important URLs:
 - https://www.micaregister.com/ncasp
 
 Entity URL pattern:
-- https://www.micaregister.com/{register}/{id}
+- https://www.micaregister.com/{register}/{slug}
+- Slugs are stable across data updates (e.g. /casp/bitpanda-asset-management-gmbh).
+- Legacy numeric-id URLs redirect to the slug URL.
 
 API docs:
 - https://api.micaregister.com/docs

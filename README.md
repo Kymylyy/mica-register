@@ -112,7 +112,7 @@ See `.env.example` and `frontend/.env.example` for local templates.
 - Set `VITE_API_URL` to your API domain (recommended: `https://api.micaregister.com`)
 - Build command: `npm run build`
 - Output directory: `dist`
-- Build output includes static prerendered pages for `/`, `/casp`, `/other`, `/art`, `/emt`, and `/ncasp`, plus entity detail pages (for example `/casp/{id}`) based on the latest API snapshot available during build.
+- Build output includes static prerendered pages for `/`, `/casp`, `/other`, `/art`, `/emt`, and `/ncasp`, plus entity detail pages under stable slugs (for example `/casp/euwax-ag`) based on the latest API snapshot available during build. Legacy numeric-id URLs (`/casp/{id}`) get redirect stubs pointing at the slug URL; unknown paths are served by a `noindex` SPA fallback (`spa-fallback.html`).
 - `sitemap.xml` and `robots.txt` are generated during prerender from the same route set (including entity detail URLs when available at build time).
 - `micaregister.com` is redirected permanently (301) to `www.micaregister.com`.
 - Detail prerender validation: by default it fails on CI/Vercel (`PRERENDER_DETAIL_FAILURE_MODE=error`) and warns locally (`warn`) when detail pages cannot be generated or are below `PRERENDER_MIN_DETAIL_PAGES` (default `1`).

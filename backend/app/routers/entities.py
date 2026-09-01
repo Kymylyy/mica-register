@@ -546,6 +546,7 @@ def _build_casp_company_payload(entities: List[Entity]) -> Dict[str, Any]:
 
     return {
         "id": primary.id,
+        "slug": primary.slug,
         "register_type": RegisterType.CASP.value,
         "competent_authority": primary.competent_authority,
         "home_member_state": primary.home_member_state,
@@ -941,6 +942,22 @@ def get_entities_count(
     return {"count": count}
 
 
+@router.get("/casp/companies/by-slug/{slug}", response_model=CaspCompanyDetail)
+def get_casp_company_by_slug(slug: str, db: Session = Depends(get_db)):
+    """Get grouped CASP company detail by its stable URL slug."""
+    entity = (
+        db.query(Entity)
+        .options(*ENTITY_EAGER_LOAD_OPTIONS)
+        .filter(Entity.slug == slug, Entity.register_type == RegisterType.CASP)
+        .first()
+    )
+    if not entity:
+        raise HTTPException(status_code=404, detail="CASP company not found")
+
+    group_rows = _load_all_rows_for_casp_groups(db, [entity])
+    return CaspCompanyDetail(**_build_casp_company_payload(group_rows))
+
+
 @router.get("/casp/companies/{entity_id}", response_model=CaspCompanyDetail)
 def get_casp_company(entity_id: int, db: Session = Depends(get_db)):
     """Get grouped CASP company detail by any raw CASP entity id in the group."""
@@ -1005,6 +1022,26 @@ def get_last_updated(
         latest_update = None
 
     return LastUpdatedResponse(register_type=register_type.value, last_updated=latest_update)
+
+
+@router.get("/entities/by-slug/{slug}", response_model=EntitySchema)
+def get_entity_by_slug(
+    slug: str,
+    register_type: Optional[RegisterType] = Query(None, description="Register type (recommended; slugs are unique per register)"),
+    db: Session = Depends(get_db)
+):
+    """Get single entity by its stable URL slug.
+
+    For CASP (where rows of one LEI share a slug) the most recently updated
+    row is returned; use /casp/companies/by-slug/{slug} for the grouped view.
+    """
+    query = db.query(Entity).options(*ENTITY_EAGER_LOAD_OPTIONS).filter(Entity.slug == slug)
+    if register_type is not None:
+        query = query.filter(Entity.register_type == register_type)
+    entity = query.order_by(Entity.last_update.desc().nullslast(), Entity.id.desc()).first()
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    return entity
 
 
 @router.get("/entities/{entity_id}", response_model=EntitySchema)

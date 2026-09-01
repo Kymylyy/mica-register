@@ -38,7 +38,7 @@ const staticRoutes = [
     label: null,
     title: 'MiCA Register | ESMA MiCA Registers in One Place',
     description:
-      'Browse all ESMA MiCA registers in one searchable interface: CASP, OTHER, ART, EMT, and NCASP.',
+      'All ESMA MiCA registers in one searchable interface: CASP, ART, EMT, OTHER, and NCASP. Free access to official ESMA data with filters, search, and an open API — refreshed with every ESMA update.',
     heading: 'MiCA Register',
     summary:
       'Public register explorer for ESMA MiCA data across CASP, OTHER, ART, EMT, and NCASP registers.',
@@ -53,9 +53,9 @@ const staticRoutes = [
     slug: 'casp',
     registerType: 'casp',
     label: 'CASP',
-    title: 'MiCA CASP Register | EU Crypto-Asset Service Providers',
+    title: 'MiCA CASP Register | ESMA-Listed Crypto-Asset Service Providers',
     description:
-      'Search the MiCA CASP register of EU crypto-asset service providers by LEI, country, services, and authorization date.',
+      'Searchable ESMA CASP register: every MiCA-authorised crypto-asset service provider in the EU. Filter by country, services, LEI, and authorisation date — updated with each ESMA publication.',
     heading: 'MiCA CASP Register',
     summary:
       'Registry view for Crypto-Asset Service Providers (CASP) under MiCA, including passport countries and service scope.',
@@ -191,18 +191,26 @@ function createDetailRoute(entity, registerRoute) {
     return null;
   }
 
+  // Stable slug URLs; numeric id is a fallback for data imported before
+  // the slug migration ran (keeps builds working during rollout)
+  const entitySlug = typeof entity?.slug === 'string' && entity.slug.trim() ? entity.slug.trim() : null;
+  const urlKey = entitySlug || String(entityId);
+
   const entityName = normalizeEntityName(entity);
   return {
-    path: `${registerRoute.path}/${entityId}`,
-    slug: `${registerRoute.slug}/${entityId}`,
+    path: `${registerRoute.path}/${urlKey}`,
+    slug: `${registerRoute.slug}/${urlKey}`,
     kind: 'detail',
+    entityId,
+    entitySlug,
+    lastmod: typeof entity?.last_update === 'string' && entity.last_update ? entity.last_update : null,
     title: `${entityName} | MiCA ${registerRoute.label} Register`,
     description: `Entity details for ${entityName} in the MiCA ${registerRoute.label} register, including jurisdiction and register-specific fields.`,
     heading: entityName,
-    summary: `Detailed profile for MiCA ${registerRoute.label} register entry ${entityId}.`,
+    summary: `Detailed profile for ${entityName} in the MiCA ${registerRoute.label} register.`,
     highlights: [
       `Register: ${registerRoute.heading}.`,
-      `Entity ID: ${entityId}.`,
+      entity?.lei ? `LEI: ${entity.lei}.` : `Entity ID: ${entityId}.`,
       'Open this URL to load the full interactive entity view.',
     ],
     registerPath: registerRoute.path,
@@ -267,6 +275,7 @@ async function fetchDetailRoutes() {
     console.log('Skipping entity detail prerender because PRERENDER_ENTITY_DETAILS=0');
     return {
       detailRoutes: [],
+      redirectStubs: [],
       registerSummaries: [],
       failures: [],
       skipped: true,
@@ -274,8 +283,10 @@ async function fetchDetailRoutes() {
   }
 
   const detailRoutes = [];
+  const redirectStubs = [];
   const registerSummaries = [];
   const failures = [];
+  const seenPaths = new Set();
 
   for (const registerRoute of registerRoutes) {
     try {
@@ -284,9 +295,23 @@ async function fetchDetailRoutes() {
 
       for (const entity of entities) {
         const detailRoute = createDetailRoute(entity, registerRoute);
-        if (detailRoute) {
+        if (!detailRoute) {
+          continue;
+        }
+
+        // CASP rows of one LEI share a slug -> one page per company
+        if (!seenPaths.has(detailRoute.path)) {
+          seenPaths.add(detailRoute.path);
           detailRoutes.push(detailRoute);
           detailCountForRegister += 1;
+        }
+
+        // Legacy numeric-id URL redirects to the slug page (meta refresh + canonical)
+        if (detailRoute.entitySlug && !seenPaths.has(`${registerRoute.path}/${detailRoute.entityId}`)) {
+          redirectStubs.push({
+            outputSlug: `${registerRoute.slug}/${detailRoute.entityId}`,
+            targetUrl: canonicalFor(`${registerRoute.path}/${detailRoute.entitySlug}`),
+          });
         }
       }
 
@@ -319,6 +344,7 @@ async function fetchDetailRoutes() {
 
   return {
     detailRoutes,
+    redirectStubs,
     registerSummaries,
     failures,
     skipped: false,
@@ -487,12 +513,48 @@ function renderRouteHtml(templateHtml, route) {
 }
 
 function buildSitemapXml(routes) {
-  const uniqueUrls = [...new Set(routes.map((route) => canonicalFor(route.path)))];
-  const urlRows = uniqueUrls
-    .map((url) => `  <url>\n    <loc>${escapeXml(url)}</loc>\n  </url>`)
+  const buildDate = new Date().toISOString().slice(0, 10);
+  const lastmodByUrl = new Map();
+  for (const route of routes) {
+    const url = canonicalFor(route.path);
+    if (!lastmodByUrl.has(url)) {
+      lastmodByUrl.set(url, route.lastmod || buildDate);
+    }
+  }
+
+  const urlRows = [...lastmodByUrl.entries()]
+    .map(([url, lastmod]) => `  <url>\n    <loc>${escapeXml(url)}</loc>\n    <lastmod>${escapeXml(lastmod)}</lastmod>\n  </url>`)
     .join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlRows}\n</urlset>\n`;
+}
+
+function buildRedirectStubHtml(targetUrl) {
+  const safeUrl = escapeHtml(targetUrl);
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Redirecting…</title>
+    <link rel="canonical" href="${safeUrl}" />
+    <meta http-equiv="refresh" content="0;url=${safeUrl}" />
+  </head>
+  <body>
+    <p>This page has moved to <a href="${safeUrl}">${safeUrl}</a>.</p>
+  </body>
+</html>
+`;
+}
+
+function buildSpaFallbackHtml(templateHtml) {
+  // Served for URLs with no prerendered file: boot the SPA, but keep the
+  // shell out of the index (no canonical, noindex) so unknown URLs stop
+  // polluting Google as homepage duplicates.
+  let html = templateHtml;
+  html = setMeta(html, /<title>[\s\S]*?<\/title>/, '<title>MiCA Register</title>', 'title');
+  html = html.replace(/[ \t]*<link rel="canonical" href="[^"]*"\s*\/?>\n?/, '');
+  html = html.replace(/<meta name="robots" content="[^"]*"\s*\/?>/, '<meta name="robots" content="noindex, follow" />');
+  return html;
 }
 
 function buildRobotsTxt() {
@@ -506,6 +568,9 @@ async function writeRouteFiles() {
   validateDetailPrerender(detailResult);
   const routes = [...staticRoutes, ...detailResult.detailRoutes];
 
+  // SPA fallback shell (see vercel.json rewrite): noindex, no canonical
+  await writeFile(path.join(distDir, 'spa-fallback.html'), buildSpaFallbackHtml(templateHtml), 'utf8');
+
   for (const route of routes) {
     const html = renderRouteHtml(templateHtml, route);
     if (route.path === '/') {
@@ -518,12 +583,20 @@ async function writeRouteFiles() {
     await writeFile(path.join(outDir, 'index.html'), html, 'utf8');
   }
 
+  // Legacy numeric-id URLs -> slug pages (meta refresh acts as a redirect for crawlers)
+  for (const stub of detailResult.redirectStubs) {
+    const outDir = path.join(distDir, stub.outputSlug);
+    await mkdir(outDir, { recursive: true });
+    await writeFile(path.join(outDir, 'index.html'), buildRedirectStubHtml(stub.targetUrl), 'utf8');
+  }
+
   await writeFile(path.join(distDir, 'sitemap.xml'), buildSitemapXml(routes), 'utf8');
   await writeFile(path.join(distDir, 'robots.txt'), buildRobotsTxt(), 'utf8');
 
   return {
     staticCount: staticRoutes.length,
     detailCount: detailResult.detailRoutes.length,
+    redirectStubCount: detailResult.redirectStubs.length,
     detailFetchFailureCount: detailResult.failures.length,
     totalCount: routes.length,
     sitemapUrlCount: new Set(routes.map((route) => canonicalFor(route.path))).size,
@@ -534,12 +607,13 @@ try {
   const {
     staticCount,
     detailCount,
+    redirectStubCount,
     detailFetchFailureCount,
     totalCount,
     sitemapUrlCount,
   } = await writeRouteFiles();
   console.log(
-    `Prerendered ${totalCount} route pages in ${distDir} (${staticCount} static + ${detailCount} detail, fetch failures: ${detailFetchFailureCount})`,
+    `Prerendered ${totalCount} route pages in ${distDir} (${staticCount} static + ${detailCount} detail, ${redirectStubCount} legacy-id redirect stubs, fetch failures: ${detailFetchFailureCount})`,
   );
   console.log(`Generated sitemap.xml with ${sitemapUrlCount} URLs and refreshed robots.txt`);
 } catch (error) {

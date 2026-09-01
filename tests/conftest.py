@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.database import Base
 from backend.app.models import (
-    Entity, Service, PassportCountry, EntityTag,
+    Entity, Service, PassportCountry, EntityTag, EntitySlug,
     CaspEntity, OtherEntity, ArtEntity, EmtEntity, NcaspEntity,
     casp_entity_service, casp_entity_passport_country,
     entity_service, entity_passport_country
@@ -71,6 +71,7 @@ def db_session(test_engine):
     session.query(EmtEntity).delete()
     session.query(NcaspEntity).delete()
     session.query(Entity).delete()
+    session.query(EntitySlug).delete()
     session.commit()
 
     yield session

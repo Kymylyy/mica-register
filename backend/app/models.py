@@ -7,7 +7,7 @@ Multi-register architecture:
 - CASP has services and passport_countries relationships
 """
 
-from sqlalchemy import Column, Integer, String, Date, Text, ForeignKey, Table, Boolean, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Date, Text, ForeignKey, Table, Boolean, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from .database import Base
 from .config.registers import RegisterType
@@ -74,6 +74,10 @@ class Entity(Base):
     lei_name = Column(String, index=True)  # Index added for search performance
     lei = Column(String, nullable=True, index=True)  # Nullable (NCASP often missing)
     lei_cou_code = Column(String(10))  # Some codes like 'BVI' are longer than 2
+
+    # Stable URL slug (assigned once per natural identity, survives re-imports
+    # via the entity_slugs registry; CASP rows of the same LEI share one slug)
+    slug = Column(String, nullable=True, index=True)
 
     # Fields present in MOST registers (nullable for OTHER/NCASP)
     commercial_name = Column(String, nullable=True, index=True)
@@ -416,3 +420,27 @@ class RegisterUpdateMetadata(Base):
         nullable=False
     )
     esma_update_date = Column(Date, nullable=False)
+
+
+class EntitySlug(Base):
+    """Persistent slug registry: natural identity -> URL slug.
+
+    Survives register re-imports (which delete and re-insert entities), so a
+    company keeps the same public URL across imports even though entities.id
+    rotates. Rows are never deleted by the import; an identity that disappears
+    from ESMA data keeps its slug reserved in case it comes back.
+    """
+    __tablename__ = "entity_slugs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    register_type = Column(String(10), nullable=False, index=True)
+    identity_key = Column(String, nullable=False)
+    slug = Column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("register_type", "identity_key", name="uq_entity_slugs_identity"),
+        UniqueConstraint("register_type", "slug", name="uq_entity_slugs_slug"),
+    )
+
+    def __repr__(self):
+        return f"<EntitySlug({self.register_type}:{self.slug})>"
